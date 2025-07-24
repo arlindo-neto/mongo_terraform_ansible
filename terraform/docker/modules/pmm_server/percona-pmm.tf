@@ -14,7 +14,7 @@ resource "docker_container" "renderer" {
     name = var.network_name
   }
   healthcheck {
-    test        = ["CMD", "node", "--version" ]
+    test        = ["CMD", "/nodejs/bin/node", "--version" ]
     interval    = "10s"
     timeout     = "10s"
     retries     = 5
