@@ -100,7 +100,7 @@ variable "replsets" {
 #       pmm_client_image = "percona/pmm-client:2.42"
 #       pmm_port = 443
 #       enable_ldap = true
-     }
+#     }
    }
 }
 
