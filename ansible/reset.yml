@@ -42,6 +42,9 @@
     - name: Remove datadir contents
       shell: rm -rf {{ mongod_path }}/*
 
+    - name: Remove vault certificate and token stuff
+      shell: rm -rf /etc/mongodb
+
 - hosts: pmm
   gather_facts: false
   become: yes
@@ -60,3 +63,12 @@
 
     - name: Remove certificate related files    
       shell: rm -f /etc/ssl/*.{crt,csr,pem,key,cnf,srl}
+
+    - name: Stop vault server
+      systemd:
+        name: vault
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove vault related files    
+      shell: rm -rf /opt/vault/data

@@ -103,11 +103,9 @@ CAFile: /etc/ssl/test-ca.pem
 
 # keyfile_encryption: true/false
 keyfile_encryption: false
-
 # Warning! This is just an example, replace with your own for prod use!
 encryption_key_content: |
   vvMTZ3dnSbG7wc6DkPpt+rp3Cc+jF8lJsYlq6QE1yEM=
-
 # path to the keyfile to encrypt
 encryption_keyfile: /opt/mongodb.key
 
@@ -117,12 +115,29 @@ vault_server: vault.example.com
 vault_port: 8200
 # path to the token used by MongoDB to access Vault
 vault_tokenfile: /etc/mongodb/token
-# Warning! This is just an example, replace with your own for prod use!
-vault_tokenfile_content: |
-  s.uTrHtzsZnEE7KyHeA797CkWA
 vault_cafile: /etc/mongodb/vault.crt
 # path to the secret within Vault
 vault_secret: secret/data/dc/psmongodb1
+
+##############
+# Vault Server
+##############
+
+vault_config_path: /etc/vault.d/vault.hcl
+root_token: |
+  s.uTrHtzsZnEE7KyHeA797CkWA
+mongodb_policy_name: "mongodb-policy"
+mongodb_policy_hcl: |
+  path "secret/data/dc/*" {
+    capabilities = ["create", "read", "update", "delete", "list"]
+  }
+  path "secret/metadata/*" {
+    capabilities = ["read"]
+  }
+  path "secret/config" {
+    capabilities = ["read"]
+  }
+mongodb_token_ttl: "30d"
 
 ##################
 ## Monitoring
@@ -140,7 +155,7 @@ pmm_server_user: admin
 pmm_server_pwd: admin
 
 # PMM agent parameters
-mongodb_pmm_user: mongodb_exporter
+mongodb_pmm_user: pmm
 # Warning! This is just an example, replace with your own for prod use!
 mongodb_pmm_user_pwd: percona
 
