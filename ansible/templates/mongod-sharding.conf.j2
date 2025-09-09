@@ -65,7 +65,7 @@ operationProfiling:
    rateLimit: 100
 
 replication:
-  replSetName: {{ cluster }}-{{ hostvars[inventory_hostname].group_names[0] }}
+  replSetName: {{ cluster }}-{{ hostvars[inventory_hostname].group_names | reject('equalto', 'shards') | list | first }}
 
 sharding:
   clusterRole: shardsvr
