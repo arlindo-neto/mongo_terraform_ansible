@@ -145,10 +145,10 @@ ansible-playbook main.yml -i inventory --tags backup
 
 ## TLS-enabled Setup
 
-There is an extra playbook `cert-setup.yml` that generates a test CA on the PMM server, then proceeds to create server certificates for each host. Finally certificates are copied to the configured location on each host. Run this playbook before the `main.yml` if you want a TLS-enabled setup and you don't have certificates prepared in advance. Remember to set `use_tls: true` in the variables file after all certificates are in place.
+There is an extra playbook `cert_setup.yml` that generates a test CA on the PMM server, then proceeds to create server certificates for each host. Finally certificates are copied to the configured location on each host. Run this playbook before the `main.yml` if you want a TLS-enabled setup and you don't have certificates prepared in advance. Remember to set `use_tls: true` in the variables file after all certificates are in place.
 
 ```
-ansible-playbook cert-setup.yml -i inventory
+ansible-playbook cert_setup.yml -i inventory
 ```
 
 ## Data-at-rest encryption with Vault
@@ -180,7 +180,7 @@ ansible-playbook vault_server.yml -i inventory
   - monitoring
     - Deploys PMM client and registers with a PMM Server
 
-### Available tags for `cert-setup.yml`:
+### Available tags for `cert_setup.yml`:
 
   - ca
     - Deploys the CA on PMM-server
