@@ -121,6 +121,12 @@ variable "pmm_port" {
   default = 8443
 }
 
+variable "enable_pmm" {
+  type        = bool
+  default     = true
+  description = "Deploy a PMM monitoring server. Set to false to skip PMM entirely."
+}
+
 #############
 # Backup
 #############
@@ -149,11 +155,9 @@ variable "backup_retention" {
 #############
 
 variable "image" {
-  description = "Available images by region"
-  default = {
-    northamerica-northeast1 = "projects/centos-cloud/global/images/centos-stream-9-v20231115"
-#    northamerica-northeast1 = "ubuntu-2404-noble-amd64-v20250527"
-  }
+  description = "GCP machine image for all instances"
+  type        = string
+  default     = "projects/centos-cloud/global/images/centos-stream-9-v20231115"
 }
 
 # Save money by running spot instances but they may be terminated by google at any time
@@ -164,6 +168,51 @@ variable "use_spot_instances" {
 
 variable "data_disk_type" {
   default = "pd-standard"
+  description = "GCP persistent disk type for MongoDB data disks (pd-standard, pd-ssd, pd-balanced)"
+}
+
+################
+# Instance types
+################
+
+variable "shardsvr_type" {
+  default     = "e2-medium"
+  description = "GCP machine type for MongoDB shard servers"
+}
+
+variable "shardsvr_volume_size" {
+  default     = 50
+  description = "Persistent disk size (GB) for MongoDB shard servers"
+}
+
+variable "configsvr_type" {
+  default     = "e2-medium"
+  description = "GCP machine type for MongoDB config servers (CSRS)"
+}
+
+variable "configsvr_volume_size" {
+  default     = 20
+  description = "Persistent disk size (GB) for MongoDB config servers"
+}
+
+variable "mongos_type" {
+  default     = "e2-medium"
+  description = "GCP machine type for mongos router instances"
+}
+
+variable "arbiter_type" {
+  default     = "e2-medium"
+  description = "GCP machine type for MongoDB arbiter nodes"
+}
+
+variable "replsetsvr_type" {
+  default     = "e2-medium"
+  description = "GCP machine type for standalone replica set data-bearing nodes"
+}
+
+variable "replsetsvr_volume_size" {
+  default     = 100
+  description = "Persistent disk size (GB) for standalone replica set data-bearing nodes"
 }
 
 #############

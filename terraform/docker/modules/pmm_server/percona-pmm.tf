@@ -10,8 +10,8 @@ resource "docker_image" "renderer" {
 }
 
 resource "docker_container" "renderer" {
-  name  = var.renderer_tag
-  hostname = var.renderer_tag
+  name  = "${var.pmm_host}-${var.renderer_tag}"
+  hostname = "${var.pmm_host}-${var.renderer_tag}"
   image = docker_image.renderer.image_id
   env = [ "IGNORE_HTTPS_ERRORS=true" ]
   network_mode = "bridge"
@@ -28,14 +28,15 @@ data "docker_registry_image" "watchtower" {
 
 resource "docker_image" "watchtower" {
   name         = var.watchtower_image
+  platform = "linux/amd64"
   pull_triggers = [data.docker_registry_image.watchtower.sha256_digest]
   keep_locally = true
 }
 
 # Create a Docker container for Watchtower
 resource "docker_container" "watchtower" {
-  name  = var.watchtower_tag
-  hostname = var.watchtower_tag
+  name  = "${var.pmm_host}-${var.watchtower_tag}"
+  hostname = "${var.pmm_host}-${var.watchtower_tag}"
   image = docker_image.watchtower.image_id
   env = [ "WATCHTOWER_HTTP_API_TOKEN=${var.watchtower_token}", "WATCHTOWER_HTTP_API_UPDATE=1" ]
   mounts {
@@ -62,6 +63,7 @@ data "docker_registry_image" "pmm" {
 
 resource "docker_image" "pmm" {
   name         = var.pmm_server_image
+  platform = "linux/amd64"
   pull_triggers = [data.docker_registry_image.pmm.sha256_digest]
   keep_locally = true
 }

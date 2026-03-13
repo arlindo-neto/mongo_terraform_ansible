@@ -22,13 +22,9 @@
               - "*.deb"
           register: copied_packages  
 
-        - name: Get the paths of copied files
-          set_fact:
-            pbm_package_list: "{{ copied_packages.files | map(attribute='path') | list }}"      
-
         - name: Install copied RPM packages (RedHat)
           yum:
-            name: "{{ pbm_package_list }}"
+            name: "{{ copied_packages.files | map(attribute='path') | list }}"
             state: present
             disablerepo: "*"
           when:
@@ -51,9 +47,8 @@
 
         - name: Install pbm packages from repository
           package:
-            name: "{{ item }}"
+            name: "{{ pbm_package }}"
             state: present
-          with_items: "{{ pbm_package }}"
 
       when: not copy_files | bool
 
@@ -66,12 +61,6 @@
       ignore_errors: true
       when: disable_telemetry | bool
 
-- name: Prepare the PBM connection string
-  hosts: cfg:shards:replsets
-  tags: backup
-  become: true
-  tasks:
-
 - name: Figure out backup URI for replica sets
   hosts: replsets
   tags: backup
@@ -79,7 +68,7 @@
   tasks:
     - name: generate PBM_MONGODB_URI
       set_fact:
-        mongodb_uri: "mongodb://{{ pbmuser }}:{{ pbmpwd }}@{% for h in groups[ group_names[0] ] %}{{ h }}:{{ mongo_port }}{% if not loop.last %},{% endif %}{% endfor %}/?replicaSet={{ group_names[0] }}&authSource=admin{% if use_tls %}&tls=true&tlsCertificateKeyFile={{ certificateKeyFile }}&tlsCAFile={{ CAFile }}{% endif %}"
+        mongodb_uri: "mongodb://{{ pbmuser }}:{{ pbmpwd }}@{% for h in groups[(group_names | difference(['replsets']))[0]] %}{{ h }}:{{ mongo_port }}{% if not loop.last %},{% endif %}{% endfor %}/?replicaSet={% if cluster is defined %}{{ cluster }}-{{ (group_names | difference(['replsets','shards']))[0] }}{% else %}{{ (group_names | difference(['replsets', 'shards']))[0] }}{% endif %}&authSource=admin{% if use_tls %}&tls=true&tlsCertificateKeyFile={{ certificateKeyFile }}&tlsCAFile={{ CAFile }}{% endif %}"
 
 - name: Figure out backup URI for sharded cluster
   hosts: shards:cfg
@@ -176,7 +165,7 @@
       cron:
         name: pbm purge
         minute: '{{ pbm_purge_minute }}'
-        hour: '{{ pbm_purge_minute }}'
+        hour: '{{ pbm_purge_hour }}'
         user: '{{ pbm_os_user }}'
         job: /usr/bin/pbm cleanup --force --older-than $(date -u -d '-{{ pbm_retention_days }} days' +'\%Y-\%m-\%d') --mongodb-uri '{{ mongodb_uri }}'
         cron_file: pbm_purge_old

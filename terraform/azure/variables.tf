@@ -113,6 +113,12 @@ variable "pmm_port" {
   default = 8443
 }
 
+variable "enable_pmm" {
+  type        = bool
+  default     = true
+  description = "Deploy a PMM monitoring server. Set to false to skip PMM entirely."
+}
+
 ################
 # Backup
 ################
@@ -160,6 +166,51 @@ variable "use_spot_instances" {
 
 variable "data_disk_type" {
   default = "Standard_LRS"
+  description = "Azure managed disk type for MongoDB data disks (Standard_LRS, Premium_LRS, StandardSSD_LRS, UltraSSD_LRS)"
+}
+
+################
+# Instance types
+################
+
+variable "shardsvr_type" {
+  default     = "Standard_B2s"
+  description = "Azure VM size for MongoDB shard servers"
+}
+
+variable "shardsvr_volume_size" {
+  default     = 50
+  description = "Managed disk size (GB) for MongoDB shard servers"
+}
+
+variable "configsvr_type" {
+  default     = "Standard_B2s"
+  description = "Azure VM size for MongoDB config servers (CSRS)"
+}
+
+variable "configsvr_volume_size" {
+  default     = 20
+  description = "Managed disk size (GB) for MongoDB config servers"
+}
+
+variable "mongos_type" {
+  default     = "Standard_B2s"
+  description = "Azure VM size for mongos router instances"
+}
+
+variable "arbiter_type" {
+  default     = "Standard_B2s"
+  description = "Azure VM size for MongoDB arbiter nodes"
+}
+
+variable "replsetsvr_type" {
+  default     = "Standard_B2s"
+  description = "Azure VM size for standalone replica set data-bearing nodes"
+}
+
+variable "replsetsvr_volume_size" {
+  default     = 100
+  description = "Managed disk size (GB) for standalone replica set data-bearing nodes"
 }
 
 ################

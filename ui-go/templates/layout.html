@@ -1,0 +1,26 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{template "title" .}} – PSMDB Sandbox</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-brand" href="/">
+      <span class="logo-icon">🍃</span> PSMDB Sandbox
+    </a>
+  </nav>
+
+  <script src="/static/app.js"></script>
+  <main class="container">
+    {{template "content" .}}
+  </main>
+
+  <footer class="site-footer">
+    <a href="https://www.percona.com" target="_blank" rel="noopener noreferrer">Percona</a>
+  </footer>
+</body>
+</html>
+{{end}}

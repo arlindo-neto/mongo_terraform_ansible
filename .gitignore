@@ -6,3 +6,15 @@
 ssh_config
 .DS_Store
 *.tfvars
+
+# Web UI runtime artifacts
+ui/environments.json
+ui/jobs/
+ui/__pycache__/
+ui/*.pyc
+
+# Go UI runtime artifacts
+environments.json
+ui-go/environments.json
+ui-go/jobs/
+ui-go/mongodeploy
