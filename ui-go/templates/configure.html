@@ -24,32 +24,52 @@
       <div class="form-group">
         <label for="prefix">Resource Prefix</label>
         <input type="text" id="prefix" name="prefix"
-               value="{{strDefault .Config.Prefix "ig"}}" placeholder="ig">
-        <small>Prefix applied to all cloud resources to avoid naming collisions.</small>
+               value="{{strDefault .Config.Prefix .EnvID}}"
+               placeholder="{{.EnvID}}">
+        <small>{{if eq $p "docker"}}Prefix applied to all Docker containers, volumes and network. Defaults to environment name.{{else}}Prefix applied to all cloud resources to avoid naming collisions. Defaults to environment name.{{end}}</small>
       </div>
     </div>
 
     {{if ne $p "docker"}}
     <div class="form-row">
       <div class="form-group">
-        <label for="mongo_release">MongoDB Release (Ansible)</label>
-        <select id="mongo_release" name="mongo_release">
+        <label for="mongo_release">MongoDB Major Version</label>
+        <select id="mongo_release" name="mongo_release"
+                onchange="onMongoReleaseChange(this)">
           {{$cur := .Config.MongoRelease}}
           {{range .PSMDBVersions}}
           <option value="{{.}}" {{if eq $cur .}}selected{{end}}>{{.}}</option>
           {{end}}
         </select>
-        <small>Percona repository identifier used by Ansible to install PSMDB.</small>
+        <small>Percona repository identifier – selects the major MongoDB release line.</small>
       </div>
       <div class="form-group">
-        <label for="pbm_release">PBM Release (Ansible)</label>
-        <select id="pbm_release" name="pbm_release">
-          {{$curPbm := .Config.PbmRelease}}
-          {{range .PBMVersions}}
-          <option value="{{.}}" {{if eq $curPbm .}}selected{{end}}>{{.}}</option>
+        <label for="mongo_version">MongoDB Specific Version</label>
+        <select id="mongo_version" name="mongo_version">
+          <option value="">latest (default)</option>
+          {{$curVer := .Config.MongoVersion}}
+          {{$release := .Config.MongoRelease}}
+          {{if $release}}
+            {{$minors := index $.PSMDBMinorVersions $release}}
+            {{range $minors}}
+            <option value="{{.}}" {{if eq $curVer .}}selected{{end}}>{{.}}</option>
+            {{end}}
           {{end}}
         </select>
-        <small>Percona Backup for MongoDB repository identifier.</small>
+        <small>Optional: pin to a specific version (e.g., 7.0.12). Leave empty to install the latest available in the selected major release.</small>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="pbm_version">PBM Version</label>
+        <select id="pbm_version" name="pbm_version">
+          <option value="">latest (default)</option>
+          {{$curPbmVer := .Config.PbmVersion}}
+          {{range .PBMVersions}}
+          <option value="{{.}}" {{if eq $curPbmVer .}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+        <small>Optional: pin to a specific PBM version (e.g., 2.7.0). Leave empty to install the latest.</small>
       </div>
     </div>
     {{end}}
@@ -78,7 +98,7 @@
       <div class="form-group">
         <label for="my_ssh_user">Default SSH User</label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
-               value="{{.Config.MySSHUser}}" placeholder="my_username">
+               value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{.OSUser}}">
         <small>Primary username Ansible uses to connect to instances (also used to generate ssh_config).</small>
       </div>
       <div class="form-group">
@@ -112,13 +132,19 @@
       <div class="form-group form-group-full">
         <label for="machine_image">Machine Image</label>
         <div style="display:flex;gap:0.5rem;align-items:center">
-          <select id="machine_image" name="machine_image" style="flex:1">
+          <select id="machine_image" name="machine_image" style="flex:1"
+                  onchange="toggleMachineImageCustom(this)">
             <option value="">— select a region first —</option>
             {{if .Config.MachineImage}}<option value="{{.Config.MachineImage}}" selected>{{.Config.MachineImage}}</option>{{end}}
+            <option value="__custom__">Custom…</option>
           </select>
           <a href="#" onclick="reloadImages(event)" style="white-space:nowrap">↻ Refresh</a>
         </div>
-        <small>GCP image used for all instances. Images are fetched from GCP and grouped by OS.</small>
+        <input type="text" id="machine_image_custom" name="machine_image_custom"
+               placeholder="projects/my-project/global/images/my-image"
+               style="display:none;margin-top:0.3rem;width:100%"
+               oninput="document.getElementById('machine_image').value='__custom__'">
+        <small>GCP image used for all instances. Images are fetched from GCP and grouped by OS. Select "Custom…" to enter a full image path.</small>
       </div>
     </div>
     <!-- gce_ssh_users: additional users whose public keys are provisioned on every instance -->
@@ -161,7 +187,7 @@
       <div class="form-group">
         <label for="my_ssh_user">Default SSH User</label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
-               value="{{strDefault .Config.MySSHUser "ec2-user"}}" placeholder="ec2-user">
+               value="{{strDefault .Config.MySSHUser "ec2-user"}}" placeholder="{{strDefault .OSUser "ec2-user"}}">
         <small>Primary username Ansible uses to connect (e.g. ec2-user for CentOS, ubuntu for Ubuntu).</small>
       </div>
     </div>
@@ -207,13 +233,19 @@
       <div class="form-group form-group-full">
         <label for="machine_image">Machine Image (AMI)</label>
         <div style="display:flex;gap:0.5rem;align-items:center">
-          <select id="machine_image" name="machine_image" style="flex:1">
+          <select id="machine_image" name="machine_image" style="flex:1"
+                  onchange="toggleMachineImageCustom(this)">
             <option value="">— select a region first —</option>
             {{if .Config.MachineImage}}<option value="{{.Config.MachineImage}}" selected>{{.Config.MachineImage}}</option>{{end}}
+            <option value="__custom__">Custom…</option>
           </select>
           <a href="#" onclick="reloadImages(event)" style="white-space:nowrap">↻ Refresh</a>
         </div>
-        <small>AMI used for all instances. Images are fetched from AWS for the selected region and grouped by OS.</small>
+        <input type="text" id="machine_image_custom" name="machine_image_custom"
+               placeholder="ami-0abcdef1234567890"
+               style="display:none;margin-top:0.3rem;width:100%"
+               oninput="document.getElementById('machine_image').value='__custom__'">
+        <small>AMI used for all instances. Images are fetched from AWS for the selected region and grouped by OS. Select "Custom…" to enter an AMI ID directly.</small>
       </div>
     </div>
     <div class="form-row">
@@ -260,7 +292,7 @@
       <div class="form-group">
         <label for="my_ssh_user">Default SSH User</label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
-               value="{{.Config.MySSHUser}}" placeholder="azureuser">
+               value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{strDefault .OSUser "azureuser"}}">
         <small>Primary username Ansible uses to connect to instances.</small>
       </div>
     </div>
@@ -296,6 +328,76 @@
       </div>
     </div>
   </section>
+  {{else if eq $p "chaos"}}
+  <section class="form-section">
+    <h2>CHAOS Settings</h2>
+    <div class="form-row">
+      <div class="form-group form-group-full">
+        <label for="chaos_api_token">CHAOS API Token</label>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <input type="password" id="chaos_api_token" name="chaos_api_token"
+                 value="{{.Config.ChaosApiToken}}" autocomplete="new-password"
+                 placeholder="Paste token or use Browse to load from file" style="flex:1">
+          <label class="btn btn-outline btn-sm" style="cursor:pointer;white-space:nowrap;margin:0">
+            Browse&hellip;
+            <input type="file" id="chaos_token_file" style="display:none"
+                   onchange="loadChaosTokenFromFile(this)">
+          </label>
+        </div>
+        <small>CHAOS API token required to create resources. Paste it directly or select a token file from disk.</small>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="my_ssh_user">SSH User</label>
+        <input type="text" id="my_ssh_user" name="my_ssh_user"
+               value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{strDefault .OSUser "ubuntu"}}">
+        <small>Username Ansible uses to connect to all CHAOS instances.</small>
+      </div>
+    </div>
+    <!-- Firewall rules: multiple per-rule entries (CIDR + port) -->
+    <div class="form-row">
+      <div class="form-group form-group-full">
+        <label>Firewall Access Rules</label>
+        <small>Define individual ingress rules. Each rule specifies the source CIDR and the destination port.
+          Leave empty for no external firewall restrictions.</small>
+        <div id="firewall-rules-container" style="margin-top:0.5rem">
+          {{range .Config.FirewallRules}}
+          <div class="firewall-rule-row" style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.4rem">
+            <input type="text" name="fw_cidr[]" value="{{.CIDR}}" placeholder="0.0.0.0/0" style="flex:2">
+            <input type="text" name="fw_port[]" value="{{.Port}}" placeholder="22" style="flex:1">
+            <input type="text" name="fw_comment[]" value="{{.Comment}}" placeholder="Comment (optional)" style="flex:3">
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.firewall-rule-row').remove()">✕</button>
+          </div>
+          {{end}}
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:0.4rem" onclick="addFirewallRule()">+ Add Rule</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="os_image">OS Image</label>
+        <select id="os_image" name="os_image">
+          {{$curOs := strDefault .Config.OsImage "Ubuntu 24.04"}}
+          <option value="Ubuntu 24.04" {{if eq $curOs "Ubuntu 24.04"}}selected{{end}}>Ubuntu 24.04</option>
+          <option value="Ubuntu 22.04" {{if eq $curOs "Ubuntu 22.04"}}selected{{end}}>Ubuntu 22.04</option>
+          <option value="Rocky Linux 9" {{if eq $curOs "Rocky Linux 9"}}selected{{end}}>Rocky Linux 9</option>
+          <option value="Rocky Linux 8" {{if eq $curOs "Rocky Linux 8"}}selected{{end}}>Rocky Linux 8</option>
+          <option value="CentOS 9" {{if eq $curOs "CentOS 9"}}selected{{end}}>CentOS 9</option>
+          <option value="Oracle Linux 9" {{if eq $curOs "Oracle Linux 9"}}selected{{end}}>Oracle Linux 9</option>
+          <option value="Oracle Linux 8" {{if eq $curOs "Oracle Linux 8"}}selected{{end}}>Oracle Linux 8</option>
+          <option value="Debian 12" {{if eq $curOs "Debian 12"}}selected{{end}}>Debian 12</option>
+        </select>
+        <small>Operating system for all CHAOS instances. Default: Ubuntu 24.04.</small>
+      </div>
+      <div class="form-group">
+        <label for="delete_after_days">Delete After (days)</label>
+        <input type="number" id="delete_after_days" name="delete_after_days"
+               value="{{intDefault .Config.DeleteAfterDays 14}}" min="0" max="30">
+        <small>CHAOS will automatically delete instances after this many days (0–30, default 14).</small>
+      </div>
+    </div>
+  </section>
   {{end}}
 
   <!-- ──────────── Sharded Clusters ──────────── -->
@@ -309,7 +411,10 @@
       {{$clusterComputeConfigured := or $.Config.ShardsvrType $.Config.ConfigsvrType $.Config.MongosType $.Config.ArbiterType $.Config.ShardsvrVolumeSize $.Config.ConfigsvrVolumeSize $.Config.DataDiskType}}
       <div class="component-block">
         <div class="component-block-header">
-          <input type="text" name="cluster_name[]" value="{{.Name}}" class="block-name-input" placeholder="cl01" required>
+          <div class="block-name-field">
+            <label class="block-name-label">Name</label>
+            <input type="text" name="cluster_name[]" value="{{.Name}}" class="block-name-input" placeholder="cl01" required>
+          </div>
           <div class="block-header-actions">
             <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
@@ -395,6 +500,116 @@
                 Bind ports to localhost only</label>
             </div>
           </div>
+          {{else if eq $p "chaos"}}
+          <!-- CHAOS: Compute Resources customize toggle (inside cluster block) -->
+          <div class="subsection-header">
+            <span class="subsection-title">Compute Resources</span>
+            <button type="button" class="btn btn-outline btn-sm compute-toggle-btn"
+                    onclick="toggleComputeBlock(this)">{{if or $.Config.ShardsvrCpuCores $.Config.ShardsvrVolumeSize $.Config.ConfigsvrCpuCores $.Config.MongosCpuCores $.Config.ArbiterCpuCores}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+          </div>
+          <div class="compute-block-body" {{if not (or $.Config.ShardsvrCpuCores $.Config.ShardsvrVolumeSize $.Config.ConfigsvrCpuCores $.Config.MongosCpuCores $.Config.ArbiterCpuCores)}}style="display:none"{{end}}>
+            <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all clusters</strong> in this deployment.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Shard Svr vCPU</label>
+                <select name="shardsvr_cpu_cores">
+                  {{$v := $.Config.ShardsvrCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Shard Svr Memory (GB)</label>
+                <select name="shardsvr_memory_gb">
+                  {{$v := $.Config.ShardsvrMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Shard Svr Disk (GB)</label>
+                <select name="shardsvr_volume_size">
+                  {{$v := $.Config.ShardsvrVolumeSize}}
+                  <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
+                  <option value="40" {{if eq $v 40}}selected{{end}}>40 GB</option>
+                  <option value="60" {{if eq $v 60}}selected{{end}}>60 GB</option>
+                  <option value="80" {{if eq $v 80}}selected{{end}}>80 GB</option>
+                  <option value="100" {{if eq $v 100}}selected{{end}}>100 GB</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Config Svr vCPU</label>
+                <select name="configsvr_cpu_cores">
+                  {{$v := $.Config.ConfigsvrCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Config Svr Memory (GB)</label>
+                <select name="configsvr_memory_gb">
+                  {{$v := $.Config.ConfigsvrMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Config Svr Disk (GB)</label>
+                <select name="configsvr_volume_size">
+                  {{$v := $.Config.ConfigsvrVolumeSize}}
+                  <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
+                  <option value="40" {{if eq $v 40}}selected{{end}}>40 GB</option>
+                  <option value="60" {{if eq $v 60}}selected{{end}}>60 GB</option>
+                  <option value="80" {{if eq $v 80}}selected{{end}}>80 GB</option>
+                  <option value="100" {{if eq $v 100}}selected{{end}}>100 GB</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Mongos vCPU</label>
+                <select name="mongos_cpu_cores">
+                  {{$v := $.Config.MongosCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Mongos Memory (GB)</label>
+                <select name="mongos_memory_gb">
+                  {{$v := $.Config.MongosMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Arbiter vCPU</label>
+                <select name="arbiter_cpu_cores">
+                  {{$v := $.Config.ArbiterCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Arbiter Memory (GB)</label>
+                <select name="arbiter_memory_gb">
+                  {{$v := $.Config.ArbiterMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+            </div>
+          </div><!-- .compute-block-body -->
           {{else}}
           <!-- Cloud: Compute Resources customize toggle (inside cluster block) -->
           <div class="subsection-header">
@@ -474,7 +689,10 @@
       {{$replsetComputeConfigured := or $.Config.ReplsetSvrType $.Config.ReplsetSvrVolumeSize $.Config.ArbiterType $.Config.DataDiskType}}
       <div class="component-block">
         <div class="component-block-header">
-          <input type="text" name="replset_name[]" value="{{.Name}}" class="block-name-input" placeholder="rs01">
+          <div class="block-name-field">
+            <label class="block-name-label">Name</label>
+            <input type="text" name="replset_name[]" value="{{.Name}}" class="block-name-input" placeholder="rs01">
+          </div>
           <div class="block-header-actions">
             <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
             <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
@@ -494,6 +712,16 @@
               <label>Arbiters</label>
               <input type="number" name="replset_arbiters[]" value="{{intDefault .Config.ArbitersPerReplset 1}}" min="0" max="3">
             </div>
+            {{if eq $p "docker"}}
+            <div class="form-group">
+              <label>Base Port</label>
+              <input type="number" name="replset_port[]"
+                     value="{{intDefault .Config.ReplsetPort 27017}}"
+                     placeholder="27017" min="1024" max="65000"
+                     title="Starting port for data nodes. Auto-assigned to avoid collisions.">
+              <small>Auto-assigned; change only if needed.</small>
+            </div>
+            {{end}}
           </div>
           {{if eq $p "docker"}}
           <div class="form-row">
@@ -548,6 +776,67 @@
                 Bind ports to localhost only</label>
             </div>
           </div>
+          {{else if eq $p "chaos"}}
+          <!-- CHAOS: Compute Resources customize toggle (inside replset block) -->
+          <div class="subsection-header">
+            <span class="subsection-title">Compute Resources</span>
+            <button type="button" class="btn btn-outline btn-sm compute-toggle-btn"
+                    onclick="toggleComputeBlock(this)">{{if or $.Config.ReplsetSvrCpuCores $.Config.ReplsetSvrVolumeSize $.Config.ArbiterCpuCores}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+          </div>
+          <div class="compute-block-body" {{if not (or $.Config.ReplsetSvrCpuCores $.Config.ReplsetSvrVolumeSize $.Config.ArbiterCpuCores)}}style="display:none"{{end}}>
+            <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all replica sets</strong> in this deployment.</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Data Node vCPU</label>
+                <select name="replsetsvr_cpu_cores">
+                  {{$v := $.Config.ReplsetSvrCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data Node Memory (GB)</label>
+                <select name="replsetsvr_memory_gb">
+                  {{$v := $.Config.ReplsetSvrMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Data Node Disk (GB)</label>
+                <select name="replsetsvr_volume_size">
+                  {{$v := $.Config.ReplsetSvrVolumeSize}}
+                  <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
+                  <option value="40" {{if eq $v 40}}selected{{end}}>40 GB</option>
+                  <option value="60" {{if eq $v 60}}selected{{end}}>60 GB</option>
+                  <option value="80" {{if eq $v 80}}selected{{end}}>80 GB</option>
+                  <option value="100" {{if eq $v 100}}selected{{end}}>100 GB</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Arbiter vCPU</label>
+                <select name="arbiter_cpu_cores">
+                  {{$v := $.Config.ArbiterCpuCores}}
+                  <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                  <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Arbiter Memory (GB)</label>
+                <select name="arbiter_memory_gb">
+                  {{$v := $.Config.ArbiterMemoryGb}}
+                  <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                  <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                  <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+                </select>
+              </div>
+            </div>
+          </div><!-- .compute-block-body -->
           {{else}}
           <!-- Cloud: Compute Resources customize toggle (inside replset block) -->
           <div class="subsection-header">
@@ -600,15 +889,23 @@
     {{if eq $p "docker"}}
     <div class="section-header">
       <h2>PMM Monitoring Server</h2>
+      <label class="toggle-label">
+        <input type="checkbox" id="enable-pmm-docker"
+               {{if .SortedPmmServers}}checked{{end}}
+               onchange="toggleDockerSingleServer('pmm-servers-container', this, addPmmServer)">
+        Include PMM Server
+      </label>
     </div>
     <div id="pmm-servers-container">
       {{range .SortedPmmServers}}
       <div class="component-block">
         <div class="component-block-header">
-          <input type="text" name="pmm_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="pmm-server">
+          <div class="block-name-field">
+            <label class="block-name-label">Name</label>
+            <input type="text" name="pmm_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="pmm-server" readonly>
+          </div>
           <div class="block-header-actions">
             <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
           </div>
         </div>
         <div class="customize-body" style="display:none">
@@ -648,14 +945,14 @@
       </div>
       {{end}}
     </div>
-    <button type="button" class="btn btn-outline btn-sm" style="margin-top:0.5rem" onclick="addPmmServer()">+ Add PMM Server</button>
     {{else}}
-    {{$pmmCustomized := or (ptrBoolFalse .Config.EnablePmm) .Config.PmmType .Config.PmmImage .Config.PmmDiskType}}
+    {{$pmmCustomized := or (ptrBoolFalse .Config.EnablePmm) .Config.PmmType .Config.PmmImage .Config.PmmDiskType .Config.PmmCpuCores .Config.PmmMemoryGb}}
     <div class="section-header">
       <h2>PMM Monitoring Server</h2>
       <button type="button" class="btn btn-outline btn-sm"
               id="pmm-toggle"
               onclick="togglePmmSettings()"
+              {{if not (boolDefault .Config.EnablePmm true)}}style="display:none"{{end}}
               >{{if $pmmCustomized}}▲ Collapse{{else}}▼ Customize{{end}}</button>
     </div>
     <!-- Deploy PMM checkbox always visible, outside the collapsible body -->
@@ -669,6 +966,45 @@
     </div>
     <div id="pmm-cloud-body" {{if not $pmmCustomized}}style="display:none"{{end}}>
     <div id="pmm-cloud-settings" {{if not (boolDefault .Config.EnablePmm true)}}style="display:none"{{end}}>
+    {{if eq $p "chaos"}}
+    <div class="form-row">
+      <div class="form-group">
+        <label for="pmm_cpu_cores">PMM vCPU</label>
+        <select id="pmm_cpu_cores" name="pmm_cpu_cores">
+          {{$v := .Config.PmmCpuCores}}
+          <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+          <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+          <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pmm_memory_gb">PMM Memory (GB)</label>
+        <select id="pmm_memory_gb" name="pmm_memory_gb">
+          {{$v := .Config.PmmMemoryGb}}
+          <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+          <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+          <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pmm_volume_size">Disk (GB)</label>
+        <select id="pmm_volume_size" name="pmm_volume_size">
+          {{$v := .Config.PmmVolumeSize}}
+          <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
+          <option value="40" {{if eq $v 40}}selected{{end}}>40 GB</option>
+          <option value="60" {{if eq $v 60}}selected{{end}}>60 GB</option>
+          <option value="80" {{if eq $v 80}}selected{{end}}>80 GB</option>
+          <option value="100" {{if eq $v 100}}selected{{end}}>100 GB</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="pmm_port">PMM Port</label>
+        <input type="number" id="pmm_port" name="pmm_port"
+               value="{{intDefault .Config.PmmPort 8443}}">
+        <small>8443 for PMM 3, 443 for PMM 2</small>
+      </div>
+    </div>
+    {{else}}
     <div class="form-row">
       <div class="form-group">
         <label for="pmm_type">Instance Type</label>
@@ -708,26 +1044,138 @@
         </select>
       </div>
     </div>
+    {{end}}
     </div><!-- #pmm-cloud-settings -->
     </div><!-- #pmm-cloud-body -->
     {{end}}
   </section>
+
+  <!-- ──────────── Minio VM (CHAOS only) ──────────── -->
+  {{if eq $p "chaos"}}
+  {{$minioDetailsConfigured := or .Config.MinioRootUser .Config.MinioRootPassword .Config.DefaultBucketName .Config.MinioPort .Config.MinioConsolePort .Config.BackupRetention .Config.MinioCpuCores .Config.MinioMemoryGb .Config.MinioVolumeSize}}
+  <section class="form-section">
+    <div class="section-header">
+      <h2>Minio Backup Storage VM</h2>
+      <button type="button" class="btn btn-outline btn-sm"
+              id="minio-details-toggle"
+              onclick="toggleMinioDetails(this)"
+              {{if not (boolDefault .Config.EnableMinio true)}}style="display:none"{{end}}
+              >{{if $minioDetailsConfigured}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+    </div>
+    <!-- Enable Minio checkbox always visible, outside the collapsible body -->
+    <div class="form-row" style="margin-bottom:0.5rem">
+      <div class="form-group form-group-checkbox">
+        <label><input type="checkbox" id="enable_minio" name="enable_minio" value="true"
+                      {{if boolDefault .Config.EnableMinio true}}checked{{end}}>
+          Deploy Minio backup storage VM</label>
+        <small>Uncheck to skip the Minio VM for this environment.</small>
+      </div>
+    </div>
+    <p class="hint">Optional: deploy a dedicated VM running <a href="https://min.io" target="_blank">Minio</a> for S3-compatible backup storage, provisioned via Ansible.</p>
+    <div id="minio-vm-body" {{if not (boolDefault .Config.EnableMinio true)}}style="display:none"{{end}}>
+      <div id="minio-details-body" {{if not $minioDetailsConfigured}}style="display:none"{{end}}>
+        <span class="subsection-title">VM Details</span>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="minio_root_user">Minio Root User</label>
+            <input type="text" id="minio_root_user" name="minio_root_user"
+                   value="{{strDefault .Config.MinioRootUser "minioadmin"}}">
+          </div>
+          <div class="form-group">
+            <label for="minio_root_password">Minio Root Password</label>
+            <input type="password" id="minio_root_password" name="minio_root_password"
+                   value="{{strDefault .Config.MinioRootPassword "minioadmin"}}" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="default_bucket_name">Bucket Name</label>
+            <input type="text" id="default_bucket_name" name="default_bucket_name"
+                   value="{{strDefault .Config.DefaultBucketName "mongo-backups"}}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="minio_port">API Port</label>
+            <input type="number" id="minio_port" name="minio_port"
+                   value="{{intDefault .Config.MinioPort 9000}}">
+          </div>
+          <div class="form-group">
+            <label for="minio_console_port">Console Port</label>
+            <input type="number" id="minio_console_port" name="minio_console_port"
+                   value="{{intDefault .Config.MinioConsolePort 9001}}">
+          </div>
+          <div class="form-group">
+            <label for="backup_retention">Retention (days)</label>
+            <input type="number" id="backup_retention" name="backup_retention"
+                   value="{{intDefault .Config.BackupRetention 2}}" min="1">
+          </div>
+        </div>
+        <!-- Compute resources hidden under nested Customize -->
+        {{$minioComputeConfigured := or .Config.MinioCpuCores .Config.MinioMemoryGb .Config.MinioVolumeSize}}
+        <div class="subsection-header">
+          <span class="subsection-title">Compute Resources</span>
+          <button type="button" class="btn btn-outline btn-sm compute-toggle-btn"
+                  onclick="toggleComputeBlock(this)">{{if $minioComputeConfigured}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+        </div>
+        <div class="compute-block-body" {{if not $minioComputeConfigured}}style="display:none"{{end}}>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="minio_cpu_cores">Minio VM vCPU</label>
+              <select id="minio_cpu_cores" name="minio_cpu_cores">
+                {{$v := .Config.MinioCpuCores}}
+                <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
+                <option value="4" {{if eq $v 4}}selected{{end}}>4 vCPU</option>
+                <option value="8" {{if eq $v 8}}selected{{end}}>8 vCPU</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="minio_memory_gb">Minio VM Memory (GB)</label>
+              <select id="minio_memory_gb" name="minio_memory_gb">
+                {{$v := .Config.MinioMemoryGb}}
+                <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
+                <option value="8" {{if eq $v 8}}selected{{end}}>8 GB</option>
+                <option value="16" {{if eq $v 16}}selected{{end}}>16 GB</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="minio_volume_size">Minio VM Disk (GB)</label>
+              <select id="minio_volume_size" name="minio_volume_size">
+                {{$v := .Config.MinioVolumeSize}}
+                <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
+                <option value="40" {{if eq $v 40}}selected{{end}}>40 GB</option>
+                <option value="60" {{if eq $v 60}}selected{{end}}>60 GB</option>
+                <option value="80" {{if eq $v 80}}selected{{end}}>80 GB</option>
+                <option value="100" {{if eq $v 100}}selected{{end}}>100 GB</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {{end}}
 
   <!-- ──────────── Minio Servers (Docker only) ──────────── -->
   {{if eq $p "docker"}}
   <section class="form-section">
     <div class="section-header">
       <h2>Minio Backup Storage</h2>
-      <button type="button" class="btn btn-outline btn-sm" onclick="addMinioServer()">+ Add Minio Server</button>
+      <label class="toggle-label">
+        <input type="checkbox" id="enable-minio-docker"
+               {{if .SortedMinio}}checked{{end}}
+               onchange="toggleDockerSingleServer('minio-servers-container', this, addMinioServer)">
+        Include Minio Server
+      </label>
     </div>
     <div id="minio-servers-container">
       {{range .SortedMinio}}
       <div class="component-block">
         <div class="component-block-header">
-          <input type="text" name="minio_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="minio">
+          <div class="block-name-field">
+            <label class="block-name-label">Name</label>
+            <input type="text" name="minio_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="minio" readonly>
+          </div>
           <div class="block-header-actions">
             <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
           </div>
         </div>
         <div class="customize-body" style="display:none">
@@ -778,16 +1226,23 @@
   <section class="form-section">
     <div class="section-header">
       <h2>LDAP Servers</h2>
-      <button type="button" class="btn btn-outline btn-sm" onclick="addLdapServer()">+ Add LDAP Server</button>
+      <label class="toggle-label">
+        <input type="checkbox" id="enable-ldap-docker"
+               {{if .SortedLdap}}checked{{end}}
+               onchange="toggleDockerSingleServer('ldap-servers-container', this, addLdapServer)">
+        Include LDAP Server
+      </label>
     </div>
     <div id="ldap-servers-container">
       {{range .SortedLdap}}
       <div class="component-block">
         <div class="component-block-header">
-          <input type="text" name="ldap_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="ldap">
+          <div class="block-name-field">
+            <label class="block-name-label">Name</label>
+            <input type="text" name="ldap_server_name[]" value="{{.Name}}" class="block-name-input" placeholder="ldap" readonly>
+          </div>
           <div class="block-header-actions">
             <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
           </div>
         </div>
         <div class="customize-body" style="display:none">
@@ -823,8 +1278,8 @@
   </section>
   {{end}}
 
-  <!-- ──────────── Backup (cloud only) ──────────── -->
-  {{if ne $p "docker"}}
+  <!-- ──────────── Backup (cloud only, not CHAOS) ──────────── -->
+  {{if and (ne $p "docker") (ne $p "chaos")}}
   <section class="form-section">
     <h2>Backup (PBM)</h2>
     <div class="form-row">
@@ -842,6 +1297,54 @@
   </section>
   {{end}}
 
+  <!-- ──────────── Credentials ──────────── -->
+  <section class="form-section">
+    {{$credConfigured := or (index .Config.AnsibleVars "mongo_admin_user") (index .Config.AnsibleVars "mongo_admin_password") (index .Config.AnsibleVars "pmm_server_user") (index .Config.AnsibleVars "pmm_server_pwd") (index .Config.AnsibleVars "pbm_agent_user") (index .Config.AnsibleVars "pbmpwd")}}
+    <div class="section-header">
+      <h2>Credentials</h2>
+      <button type="button" class="btn btn-outline btn-sm" id="credentials-toggle"
+              onclick="toggleCredentials(this)">{{if $credConfigured}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+    </div>
+    <p class="hint">Usernames and passwords passed to Ansible and Terraform. Values here populate <code>group_vars</code> or <code>--extra-vars</code>.</p>
+    <div id="credentials-body" {{if not $credConfigured}}style="display:none"{{end}}>
+      <div class="credentials-grid">
+        <div class="form-group">
+          <label for="cred_mongo_admin_user">MongoDB Root User</label>
+          <input type="text" id="cred_mongo_admin_user" name="cred_mongo_admin_user"
+                 value="{{index .Config.AnsibleVars "mongo_admin_user"}}" placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label for="cred_mongo_admin_password">MongoDB Root Password</label>
+          <input type="password" id="cred_mongo_admin_password" name="cred_mongo_admin_password"
+                 value="{{index .Config.AnsibleVars "mongo_admin_password"}}" placeholder="admin"
+                 autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="cred_pmm_server_user">PMM User</label>
+          <input type="text" id="cred_pmm_server_user" name="cred_pmm_server_user"
+                 value="{{index .Config.AnsibleVars "pmm_server_user"}}" placeholder="admin">
+        </div>
+        <div class="form-group">
+          <label for="cred_pmm_server_pwd">PMM Password</label>
+          <input type="password" id="cred_pmm_server_pwd" name="cred_pmm_server_pwd"
+                 value="{{index .Config.AnsibleVars "pmm_server_pwd"}}" placeholder="admin"
+                 autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="cred_pbm_agent_user">PBM Agent User</label>
+          <input type="text" id="cred_pbm_agent_user" name="cred_pbm_agent_user"
+                 value="{{index .Config.AnsibleVars "pbm_agent_user"}}" placeholder="pbmagent">
+        </div>
+        <div class="form-group">
+          <label for="cred_pbmpwd">PBM Agent Password</label>
+          <input type="password" id="cred_pbmpwd" name="cred_pbmpwd"
+                 value="{{index .Config.AnsibleVars "pbmpwd"}}" placeholder="pbmpassword"
+                 autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ──────────── Ansible Variable Overrides (cloud only) ──────────── -->
   {{if ne $p "docker"}}
   <section class="form-section">
@@ -853,6 +1356,7 @@
     </p>
     <div id="ansible-vars-container">
       {{range $k, $v := .Config.AnsibleVars}}
+      {{if not (or (eq $k "mongo_admin_user") (eq $k "mongo_admin_password") (eq $k "pmm_server_user") (eq $k "pmm_server_pwd") (eq $k "pbm_agent_user") (eq $k "mongodb_pmm_user_pwd") (eq $k "pbmpwd"))}}
       <div class="ansible-var-row">
         <input type="text"     name="ansible_var_key[]"   value="{{$k}}" placeholder="variable_name">
         <input type="password" name="ansible_var_val[]"   value="{{$v}}" placeholder="value"
@@ -860,6 +1364,7 @@
         <button type="button" class="btn btn-danger btn-sm" onclick="removeAnsibleVar(this)"
                 title="Remove this variable override">✕</button>
       </div>
+      {{end}}
       {{end}}
     </div>
     <button type="button" class="btn btn-outline btn-sm" style="margin-top:0.5rem"
@@ -869,11 +1374,7 @@
         Common variables to override
       </summary>
       <ul style="margin:0.5rem 0 0 1rem;font-size:0.83rem;color:var(--color-muted)">
-        <li><code>mongo_admin_password</code> – MongoDB root password</li>
         <li><code>keyfile_content</code> – replica-set keyfile (output of <code>openssl rand -base64 741</code>)</li>
-        <li><code>pmm_server_pwd</code> – PMM admin password</li>
-        <li><code>mongodb_pmm_user_pwd</code> – PMM monitoring user password</li>
-        <li><code>pbmpwd</code> – PBM service account password</li>
         <li><code>access_key_id</code> – S3/object-storage access key for backups</li>
         <li><code>secret_access_key</code> – S3/object-storage secret key for backups</li>
         <li><code>encryption_key_content</code> – data-at-rest encryption key</li>
@@ -897,17 +1398,86 @@ const PMM_CLIENT_IMAGES = {{json .PMMClientImages}};
 const PMM_SERVER_IMAGES = {{json .PMMImages}};
 const PSMDB_VERSIONS  = {{json .PSMDBVersions}};
 const PBM_VERSIONS    = {{json .PBMVersions}};
+// Minor versions keyed by major release identifier, e.g. {"psmdb-70": ["7.0.12", ...]}
+// Declared as let so the async /api/versions refresh can update it in-place.
+let PSMDB_MINOR_VERSIONS = {{json .PSMDBMinorVersions}};
+
+// Refresh a <select> with a new list of values, preserving the current selection.
+// valueOf(v) maps a raw list item to the option value; labelOf(v) maps it to the
+// display label. An empty/"latest" option is prepended when includeEmpty is true.
+function refreshVersionSelect(id, items, valueOf, labelOf, includeEmpty = true) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const prev = sel.value;
+  let html = includeEmpty ? '<option value="">latest (default)</option>' : '';
+  for (const v of items) {
+    const val = escHtml(valueOf(v));
+    const lbl = escHtml(labelOf(v));
+    html += `<option value="${val}"${val === prev ? ' selected' : ''}>${lbl}</option>`;
+  }
+  sel.innerHTML = html;
+  // Restore previous value if still present.
+  if (prev) sel.value = prev;
+}
 
 function removeBlock(btn) {
-  btn.closest('.component-block').remove();
+  const block = btn.closest('.component-block');
+  const container = block.parentElement;
+  block.remove();
+  // If this was a single-server container (PMM/Minio/LDAP), uncheck the toggle.
+  const toggleMap = {
+    'pmm-servers-container':  'enable-pmm-docker',
+    'minio-servers-container':'enable-minio-docker',
+    'ldap-servers-container': 'enable-ldap-docker',
+  };
+  const cbId = toggleMap[container.id];
+  if (cbId) {
+    const cb = document.getElementById(cbId);
+    if (cb) cb.checked = false;
+  }
+}
+
+// Toggle a Docker single-server block (PMM / Minio / LDAP).
+// When checked: show the block (auto-creating it if empty).
+// When unchecked: disable & hide the block so it is excluded from form data.
+function toggleDockerSingleServer(containerId, checkbox, addFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (checkbox.checked) {
+    if (!container.querySelector('.component-block')) {
+      addFn();
+    }
+    container.querySelectorAll('.component-block').forEach(b => {
+      b.style.display = '';
+      b.querySelectorAll('input,select,textarea').forEach(f => { f.disabled = false; });
+    });
+  } else {
+    container.querySelectorAll('.component-block').forEach(b => {
+      b.style.display = 'none';
+      b.querySelectorAll('input,select,textarea').forEach(f => { f.disabled = true; });
+    });
+  }
 }
 
 // Toggle the PMM cloud-settings sub-panel when the enable_pmm checkbox changes.
+// Also show/hide the ▼ Customize button so it only appears when PMM is enabled.
 (function() {
   const cb = document.getElementById('enable_pmm');
   if (!cb) return;
   const panel = document.getElementById('pmm-cloud-settings');
-  cb.addEventListener('change', () => { panel.style.display = cb.checked ? '' : 'none'; });
+  const toggleBtn = document.getElementById('pmm-toggle');
+  cb.addEventListener('change', () => {
+    if (panel) panel.style.display = cb.checked ? '' : 'none';
+    if (toggleBtn) {
+      toggleBtn.style.display = cb.checked ? '' : 'none';
+      // Collapse the customize body when PMM is disabled.
+      if (!cb.checked) {
+        const body = document.getElementById('pmm-cloud-body');
+        if (body) body.style.display = 'none';
+        toggleBtn.textContent = '▼ Customize';
+      }
+    }
+  });
 })();
 
 function togglePmmSettings() {
@@ -927,6 +1497,52 @@ function toggleComputeBlock(btn) {
   btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
 }
 
+function loadChaosTokenFromFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('chaos_api_token').value = e.target.result.trim();
+  };
+  reader.readAsText(file);
+}
+
+// Toggle the Minio VM body and Customize button when enable_minio checkbox changes.
+(function() {
+  const cb = document.getElementById('enable_minio');
+  if (!cb) return;
+  const body = document.getElementById('minio-vm-body');
+  const toggleBtn = document.getElementById('minio-details-toggle');
+  cb.addEventListener('change', () => {
+    if (body) body.style.display = cb.checked ? '' : 'none';
+    if (toggleBtn) {
+      toggleBtn.style.display = cb.checked ? '' : 'none';
+      // Collapse the customize body when Minio is disabled.
+      if (!cb.checked) {
+        const detailsBody = document.getElementById('minio-details-body');
+        if (detailsBody) detailsBody.style.display = 'none';
+        toggleBtn.textContent = '▼ Customize';
+      }
+    }
+  });
+})();
+
+function toggleMinioDetails(btn) {
+  const body = document.getElementById('minio-details-body');
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
+}
+
+function toggleCredentials(btn) {
+  const body = document.getElementById('credentials-body');
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
+}
+
 // Toggle the per-block .customize-body panel (clusters, replsets, Docker servers).
 function toggleCustomizeBlock(btn) {
   const body = btn.closest('.component-block').querySelector('.customize-body');
@@ -936,6 +1552,31 @@ function toggleCustomizeBlock(btn) {
   btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
 }
 
+function toggleMachineImageCustom(sel) {
+  const customInput = document.getElementById('machine_image_custom');
+  if (!customInput) return;
+  if (sel.value === '__custom__') {
+    customInput.style.display = '';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+}
+
+// Cascade: when the major MongoDB release (psmdb-70, psmdb-80…) changes,
+// repopulate the specific version dropdown.
+function onMongoReleaseChange(sel) {
+  const versionSel = document.getElementById('mongo_version');
+  if (!versionSel) return;
+  const release = sel.value;
+  const minors = (PSMDB_MINOR_VERSIONS && PSMDB_MINOR_VERSIONS[release]) || [];
+  // Keep the currently selected value if it's still valid.
+  const prevVal = versionSel.value;
+  versionSel.innerHTML = '<option value="">latest (default)</option>' +
+    minors.map(v => `<option value="${escHtml(v)}" ${v === prevVal ? 'selected' : ''}>${escHtml(v)}</option>`).join('');
+}
+
+// Cascade: when the major PBM release changes, repopulate the version dropdown.
 function nextClusterName() {
   let max = 0;
   document.querySelectorAll('#clusters-container input[name="cluster_name[]"]').forEach(el => {
@@ -958,19 +1599,72 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function buildImageSelect(name, images, prefix, defaultVal) {
+  const sel = images.map(t => `<option value="${escHtml(t)}"${defaultVal === t ? ' selected' : ''}>${escHtml(prefix)}:${escHtml(t)}</option>`).join('');
+  const uid = name.replace(/[\[\]]/g, '_') + '_' + Math.random().toString(36).slice(2, 6);
+  return `<div class="image-select-wrapper">
+    <select name="${escHtml(name)}" id="${uid}" onchange="toggleCustomImageInput(this)">
+      ${sel}
+      <option value="__custom__">Custom…</option>
+    </select>
+    <input type="text" class="custom-image-input" id="${uid}_custom" name="${escHtml(name)}_custom"
+           placeholder="registry/repo:tag"
+           style="display:none;margin-top:0.3rem"
+           oninput="syncCustomImageOption(this)">
+  </div>`;
+}
+
+function toggleCustomImageInput(sel) {
+  const wrapper = sel.parentElement;
+  const customInput = wrapper.querySelector('.custom-image-input');
+  if (sel.value === '__custom__') {
+    customInput.style.display = '';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+}
+
+function syncCustomImageOption(input) {
+  // Keep the __custom__ option selected and store value in hidden field.
+  const wrapper = input.parentElement;
+  const sel = wrapper.querySelector('select');
+  sel.value = '__custom__';
+}
+
+function getImageValue(wrapper) {
+  if (!wrapper) return '';
+  const sel = wrapper.querySelector('select');
+  if (!sel) return '';
+  if (sel.value === '__custom__') {
+    const ci = wrapper.querySelector('.custom-image-input');
+    return ci ? ci.value.trim() : '';
+  }
+  return sel.value;
+}
+
 function buildDockerImageRows(type) {
   if (type !== 'cluster' && type !== 'replset') return '';
-  const psmdbSel = PSMDB_IMAGES.map(t => `<option value="${escHtml(t)}">percona/percona-server-mongodb:${escHtml(t)}</option>`).join('');
-  const pbmSel   = PBM_IMAGES.map(t => `<option value="${escHtml(t)}">percona/percona-backup-mongodb:${escHtml(t)}</option>`).join('');
-  const pmmcSel  = PMM_CLIENT_IMAGES.map(t => `<option value="${escHtml(t)}">percona/pmm-client:${escHtml(t)}</option>`).join('');
+  const psmdbSel = PSMDB_IMAGES.map(t => `<option value="${escHtml(t)}">percona/percona-server-mongodb:${escHtml(t)}</option>`).join('') +
+    `<option value="__custom__">Custom…</option>`;
+  const pbmSel   = PBM_IMAGES.map(t => `<option value="${escHtml(t)}">percona/percona-backup-mongodb:${escHtml(t)}</option>`).join('') +
+    `<option value="__custom__">Custom…</option>`;
+  const pmmcSel  = PMM_CLIENT_IMAGES.map(t => `<option value="${escHtml(t)}">percona/pmm-client:${escHtml(t)}</option>`).join('') +
+    `<option value="__custom__">Custom…</option>`;
+  const makeImageGroup = (label, selectName, options) => `
+    <div class="form-group"><label>${label}</label>
+      <div class="image-select-wrapper">
+        <select name="${type}_${selectName}" onchange="toggleCustomImageInput(this)">${options}</select>
+        <input type="text" class="custom-image-input" name="${type}_${selectName}_custom"
+               placeholder="registry/repo:tag" style="display:none;margin-top:0.3rem"
+               oninput="syncCustomImageOption(this)">
+      </div>
+    </div>`;
   return `
     <div class="form-row">
-      <div class="form-group"><label>PSMDB Image</label>
-        <select name="${type}_psmdb_image[]">${psmdbSel}</select></div>
-      <div class="form-group"><label>PBM Image</label>
-        <select name="${type}_pbm_image[]">${pbmSel}</select></div>
-      <div class="form-group"><label>PMM Client Image</label>
-        <select name="${type}_pmm_client_image[]">${pmmcSel}</select></div>
+      ${makeImageGroup('PSMDB Image', 'psmdb_image[]', psmdbSel)}
+      ${makeImageGroup('PBM Image', 'pbm_image[]', pbmSel)}
+      ${makeImageGroup('PMM Client Image', 'pmm_client_image[]', pmmcSel)}
     </div>
     <div class="form-row">
       <div class="form-group form-group-checkbox">
@@ -985,6 +1679,129 @@ function buildDockerImageRows(type) {
 function buildCloudComputeRows(type) {
   // `type` is 'cluster' or 'replset'; returns HTML for the compute customize section.
   if (PLATFORM === 'docker') return '';
+  if (PLATFORM === 'chaos') {
+    let rows = '';
+    if (type === 'cluster') {
+      rows = `
+        <div class="form-row">
+          <div class="form-group"><label>Shard Svr vCPU</label>
+            <select name="shardsvr_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Shard Svr Memory (GB)</label>
+            <select name="shardsvr_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+          <div class="form-group"><label>Shard Svr Disk (GB)</label>
+            <select name="shardsvr_volume_size">
+              <option value="20" selected>20 GB</option>
+              <option value="40">40 GB</option>
+              <option value="60">60 GB</option>
+              <option value="80">80 GB</option>
+              <option value="100">100 GB</option>
+            </select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Config Svr vCPU</label>
+            <select name="configsvr_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Config Svr Memory (GB)</label>
+            <select name="configsvr_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+          <div class="form-group"><label>Config Svr Disk (GB)</label>
+            <select name="configsvr_volume_size">
+              <option value="20" selected>20 GB</option>
+              <option value="40">40 GB</option>
+              <option value="60">60 GB</option>
+              <option value="80">80 GB</option>
+              <option value="100">100 GB</option>
+            </select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Mongos vCPU</label>
+            <select name="mongos_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Mongos Memory (GB)</label>
+            <select name="mongos_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+          <div class="form-group"><label>Arbiter vCPU</label>
+            <select name="arbiter_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Arbiter Memory (GB)</label>
+            <select name="arbiter_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+        </div>`;
+    } else {
+      rows = `
+        <div class="form-row">
+          <div class="form-group"><label>Data Node vCPU</label>
+            <select name="replsetsvr_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Data Node Memory (GB)</label>
+            <select name="replsetsvr_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+          <div class="form-group"><label>Data Node Disk (GB)</label>
+            <select name="replsetsvr_volume_size">
+              <option value="20" selected>20 GB</option>
+              <option value="40">40 GB</option>
+              <option value="60">60 GB</option>
+              <option value="80">80 GB</option>
+              <option value="100">100 GB</option>
+            </select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Arbiter vCPU</label>
+            <select name="arbiter_cpu_cores">
+              <option value="2" selected>2 vCPU</option>
+              <option value="4">4 vCPU</option>
+              <option value="8">8 vCPU</option>
+            </select></div>
+          <div class="form-group"><label>Arbiter Memory (GB)</label>
+            <select name="arbiter_memory_gb">
+              <option value="4" selected>4 GB</option>
+              <option value="8">8 GB</option>
+              <option value="16">16 GB</option>
+            </select></div>
+        </div>`;
+    }
+    return `
+      <div class="subsection-header">
+        <span class="subsection-title">Compute Resources</span>
+        <button type="button" class="btn btn-outline btn-sm compute-toggle-btn" onclick="toggleComputeBlock(this)">▼ Customize</button>
+      </div>
+      <div class="compute-block-body" style="display:none">
+        <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all ${type === 'cluster' ? 'clusters' : 'replica sets'}</strong> in this deployment.</p>
+        ${rows}
+      </div>`;
+  }
   const ph = PLATFORM === 'aws' ? 't3.medium' : PLATFORM === 'gcp' ? 'e2-medium' : 'Standard_B2s';
   const diskPh = PLATFORM === 'aws' ? 'gp2' : PLATFORM === 'gcp' ? 'pd-standard' : 'Standard_LRS';
   const diskHint = PLATFORM === 'aws' ? 'gp2, gp3, io1, io2' : PLATFORM === 'gcp' ? 'pd-standard, pd-ssd, pd-balanced' : 'Standard_LRS, Premium_LRS, StandardSSD_LRS';
@@ -1036,7 +1853,7 @@ function buildCloudComputeRows(type) {
       <button type="button" class="btn btn-outline btn-sm compute-toggle-btn" onclick="toggleComputeBlock(this)">▼ Customize</button>
     </div>
     <div class="compute-block-body" style="display:none">
-      <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all clusters/replica sets</strong> in this deployment. Leave blank for Terraform defaults.</p>
+      <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all ${type === 'cluster' ? 'clusters' : 'replica sets'}</strong> in this deployment. Leave blank for Terraform defaults.</p>
       ${rows}
     </div>`;
 }
@@ -1049,7 +1866,10 @@ function addCluster() {
   const computeRows = buildCloudComputeRows('cluster');
   c.innerHTML = `
     <div class="component-block-header">
-      <input type="text" name="cluster_name[]" value="${escHtml(name)}" class="block-name-input" placeholder="cl01" required>
+      <div class="block-name-field">
+        <label class="block-name-label">Name</label>
+        <input type="text" name="cluster_name[]" value="${escHtml(name)}" class="block-name-input" placeholder="cl01" required>
+      </div>
       <div class="block-header-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
@@ -1081,9 +1901,14 @@ function addReplset() {
   c.className = 'component-block';
   const dockerRows = PLATFORM === 'docker' ? buildDockerImageRows('replset') : '';
   const computeRows = buildCloudComputeRows('replset');
+  // Pick a random base port between 28000-38000 for Docker to avoid collisions.
+  const randomPort = PLATFORM === 'docker' ? (28000 + Math.floor(Math.random() * 10000)) : 0;
   c.innerHTML = `
     <div class="component-block-header">
-      <input type="text" name="replset_name[]" value="${escHtml(name)}" class="block-name-input" placeholder="rs01">
+      <div class="block-name-field">
+        <label class="block-name-label">Name</label>
+        <input type="text" name="replset_name[]" value="${escHtml(name)}" class="block-name-input" placeholder="rs01">
+      </div>
       <div class="block-header-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
@@ -1097,6 +1922,10 @@ function addReplset() {
           <input type="number" name="replset_data_nodes[]" value="2" min="1" max="7"></div>
         <div class="form-group"><label>Arbiters</label>
           <input type="number" name="replset_arbiters[]" value="1" min="0" max="3"></div>
+        ${PLATFORM === 'docker' ? `<div class="form-group"><label>Base Port</label>
+          <input type="number" name="replset_port[]" value="${randomPort}" placeholder="auto" min="1024" max="65000"
+                 title="Auto-assigned random port to avoid collisions with other replica sets.">
+          <small>Auto-assigned on creation.</small></div>` : ''}
       </div>
       ${dockerRows}${computeRows}
     </div>`;
@@ -1104,14 +1933,18 @@ function addReplset() {
 }
 
 function addPmmServer() {
+  const container = document.getElementById('pmm-servers-container');
+  if (container.querySelectorAll('.component-block').length >= 1) return;
   const c = document.createElement('div');
   c.className = 'component-block';
   c.innerHTML = `
     <div class="component-block-header">
-      <input type="text" name="pmm_server_name[]" class="block-name-input" placeholder="pmm-server">
+      <div class="block-name-field">
+        <label class="block-name-label">Name</label>
+        <input type="text" name="pmm_server_name[]" class="block-name-input" placeholder="pmm-server" value="pmm-server" readonly>
+      </div>
       <div class="block-header-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
       </div>
     </div>
     <div class="customize-body" style="display:none">
@@ -1129,21 +1962,25 @@ function addPmmServer() {
         <div class="form-group"><label>Admin Password</label>
           <input type="password" name="pmm_server_pwd[]" placeholder="admin"></div>
         <div class="form-group form-group-checkbox">
-          <label><input type="checkbox" name="pmm_server_bind_localhost[]" value="1"> Bind to localhost only</label></div>
+          <label><input type="checkbox" name="pmm_server_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
     </div>`;
-  document.getElementById('pmm-servers-container').appendChild(c);
+  container.appendChild(c);
 }
 
 function addMinioServer() {
+  const container = document.getElementById('minio-servers-container');
+  if (container.querySelectorAll('.component-block').length >= 1) return;
   const c = document.createElement('div');
   c.className = 'component-block';
   c.innerHTML = `
     <div class="component-block-header">
-      <input type="text" name="minio_server_name[]" class="block-name-input" placeholder="minio">
+      <div class="block-name-field">
+        <label class="block-name-label">Name</label>
+        <input type="text" name="minio_server_name[]" class="block-name-input" placeholder="minio" value="minio" readonly>
+      </div>
       <div class="block-header-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
       </div>
     </div>
     <div class="customize-body" style="display:none">
@@ -1168,18 +2005,22 @@ function addMinioServer() {
           <label><input type="checkbox" name="minio_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
     </div>`;
-  document.getElementById('minio-servers-container').appendChild(c);
+  container.appendChild(c);
 }
 
 function addLdapServer() {
+  const container = document.getElementById('ldap-servers-container');
+  if (container.querySelectorAll('.component-block').length >= 1) return;
   const c = document.createElement('div');
   c.className = 'component-block';
   c.innerHTML = `
     <div class="component-block-header">
-      <input type="text" name="ldap_server_name[]" class="block-name-input" placeholder="ldap">
+      <div class="block-name-field">
+        <label class="block-name-label">Name</label>
+        <input type="text" name="ldap_server_name[]" class="block-name-input" placeholder="ldap" value="ldap" readonly>
+      </div>
       <div class="block-header-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick="toggleCustomizeBlock(this)">▼ Customize</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="removeBlock(this)">Remove</button>
       </div>
     </div>
     <div class="customize-body" style="display:none">
@@ -1198,13 +2039,23 @@ function addLdapServer() {
           <label><input type="checkbox" name="ldap_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
     </div>`;
-  document.getElementById('ldap-servers-container').appendChild(c);
+  container.appendChild(c);
 }
 
 // Integer fields – send as numbers in JSON (not strings) so Go unmarshal works cleanly.
 const numericFields = new Set([
   'pmm_volume_size','pmm_port','subnet_count','backup_retention',
   'shardsvr_volume_size','configsvr_volume_size','replsetsvr_volume_size',
+  // CHAOS-specific numeric fields
+  'delete_after_days',
+  'shardsvr_cpu_cores','shardsvr_memory_gb',
+  'configsvr_cpu_cores','configsvr_memory_gb',
+  'mongos_cpu_cores','mongos_memory_gb',
+  'arbiter_cpu_cores','arbiter_memory_gb',
+  'replsetsvr_cpu_cores','replsetsvr_memory_gb',
+  'minio_cpu_cores','minio_memory_gb','minio_volume_size',
+  'minio_port','minio_console_port',
+  'pmm_cpu_cores','pmm_memory_gb',
 ]);
 
 // ── SSH Users (add/remove rows) ──────────────────────────────────────────────
@@ -1247,6 +2098,18 @@ function addAnsibleVar() {
 
 function removeAnsibleVar(btn) {
   btn.closest('.ansible-var-row').remove();
+}
+
+function addFirewallRule() {
+  const row = document.createElement('div');
+  row.className = 'firewall-rule-row';
+  row.style.cssText = 'display:flex;gap:0.5rem;align-items:center;margin-bottom:0.4rem';
+  row.innerHTML = `
+    <input type="text" name="fw_cidr[]" placeholder="0.0.0.0/0" style="flex:2">
+    <input type="text" name="fw_port[]" placeholder="22" style="flex:1">
+    <input type="text" name="fw_comment[]" placeholder="Comment (optional)" style="flex:3">
+    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.firewall-rule-row').remove()">✕</button>`;
+  document.getElementById('firewall-rules-container').appendChild(row);
 }
 
 // ── Cloud Regions ─────────────────────────────────────────────────────────────
@@ -1431,18 +2294,61 @@ async function pickSshUserKey(btn) {
   fileInput.click();
 }
 
+// On page load, populate the MongoDB specific version dropdown based on the
+// currently selected major release, so the dropdown is ready without requiring
+// user interaction.
+// Also fetch versions asynchronously so selects are populated even if the cache
+// was cold when the page was server-rendered.
+document.addEventListener('DOMContentLoaded', () => {
+  const mongoRelSel = document.getElementById('mongo_release');
+  if (mongoRelSel) onMongoReleaseChange(mongoRelSel);
 
+  // Async version refresh — updates global JS constants and repopulates selects.
+  fetch('/api/versions')
+    .then(r => r.json())
+    .then(data => {
+      if (data.psmdb_versions && data.psmdb_versions.length) {
+        refreshVersionSelect('mongo_release', data.psmdb_versions, v => v,
+          v => v.replace('psmdb-', 'PSMDB ').replace(/(\d)(\d)$/, '$1.$2'));
+        // Keep PSMDB_MINOR_VERSIONS in sync so cascade still works.
+        if (data.psmdb_minor_versions) {
+          Object.assign(PSMDB_MINOR_VERSIONS, data.psmdb_minor_versions);
+        }
+        const rel = document.getElementById('mongo_release');
+        if (rel) onMongoReleaseChange(rel);
+      }
+      if (data.pbm_versions && data.pbm_versions.length) {
+        refreshVersionSelect('pbm_version', data.pbm_versions, v => v, v => v);
+      }
+    })
+    .catch(() => {}); // silently ignore if offline
+});
 
 document.getElementById('config-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
   const fd = new FormData(form);
 
+  // Validate mandatory CHAOS API token before doing anything else.
+  if (PLATFORM === 'chaos') {
+    const token = (fd.get('chaos_api_token') || '').trim();
+    if (!token) {
+      const tokenInput = document.getElementById('chaos_api_token');
+      if (tokenInput) {
+        tokenInput.focus();
+        tokenInput.style.outline = '2px solid red';
+        setTimeout(() => { tokenInput.style.outline = ''; }, 3000);
+      }
+      alert('CHAOS API Token is required. Please paste your token or load it from a file.');
+      return;
+    }
+  }
+
   const config = {};
 
   // Simple scalar fields
   const simpleFields = [
-    'prefix','mongo_release','pbm_release','project_id','region','location',
+    'prefix','mongo_release','mongo_version','pbm_version','project_id','region','location',
     'subnet_cidr','subnet_count','source_ranges',
     'my_ssh_user','ssh_public_key_path','default_key_pair','default_vpc_name',
     'enable_ssh_gateway','ssh_gateway_name','port_to_forward',
@@ -1455,6 +2361,18 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     'configsvr_type','configsvr_volume_size',
     'mongos_type','arbiter_type',
     'replsetsvr_type','replsetsvr_volume_size',
+    // CHAOS-specific fields
+    'chaos_api_token',
+    'delete_after_days','os_image',
+    'shardsvr_cpu_cores','shardsvr_memory_gb',
+    'configsvr_cpu_cores','configsvr_memory_gb',
+    'mongos_cpu_cores','mongos_memory_gb',
+    'arbiter_cpu_cores','arbiter_memory_gb',
+    'replsetsvr_cpu_cores','replsetsvr_memory_gb',
+    'minio_cpu_cores','minio_memory_gb','minio_volume_size',
+    'minio_port','minio_console_port',
+    'minio_root_user','minio_root_password',
+    'pmm_cpu_cores','pmm_memory_gb',
   ];
   for (const f of simpleFields) {
     const raw = fd.get(f);
@@ -1462,11 +2380,19 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
       config[f] = numericFields.has(f) ? parseInt(raw, 10) : raw;
     }
   }
+  // Handle custom machine image: if "__custom__" selected, use the text input value.
+  if (config.machine_image === '__custom__') {
+    const customVal = (fd.get('machine_image_custom') || '').trim();
+    config.machine_image = customVal;
+  }
   config.use_spot_instances = fd.has('use_spot_instances');
   if (PLATFORM !== 'docker') {
     // enable_pmm is a tri-state *bool on the server: only send false when the
     // user explicitly unchecked it; when checked send true so it's stored.
     config.enable_pmm = fd.has('enable_pmm');
+  }
+  if (PLATFORM === 'chaos') {
+    config.enable_minio = fd.has('enable_minio');
   }
 
   // SSH Users map (cloud only)
@@ -1507,6 +2433,40 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     }
   }
 
+  // Credentials: merge into ansible_vars for all platforms.
+  const credFields = [
+    ['mongo_admin_user',      fd.get('cred_mongo_admin_user')],
+    ['mongo_admin_password',  fd.get('cred_mongo_admin_password')],
+    ['pmm_server_user',       fd.get('cred_pmm_server_user')],
+    ['pmm_server_pwd',        fd.get('cred_pmm_server_pwd')],
+    ['pbm_agent_user',        fd.get('cred_pbm_agent_user')],
+    ['pbmpwd',                fd.get('cred_pbmpwd')],
+  ];
+  for (const [key, val] of credFields) {
+    if (val && val.trim()) {
+      if (!config.ansible_vars) config.ansible_vars = {};
+      config.ansible_vars[key] = val.trim();
+    }
+  }
+
+  // Firewall rules (CHAOS only) — collected from multi-row table.
+  if (PLATFORM === 'chaos') {
+    const fwCidrs    = fd.getAll('fw_cidr[]');
+    const fwPorts    = fd.getAll('fw_port[]');
+    const fwComments = fd.getAll('fw_comment[]');
+    const firewallRules = [];
+    for (let i = 0; i < fwCidrs.length; i++) {
+      const cidr = fwCidrs[i].trim();
+      const port = fwPorts[i].trim();
+      if (cidr && port) {
+        firewallRules.push({ cidr, port, comment: fwComments[i] ? fwComments[i].trim() : '' });
+      }
+    }
+    if (firewallRules.length > 0) {
+      config.firewall_rules = firewallRules;
+    }
+  }
+
   // Clusters
   const clNames     = fd.getAll('cluster_name[]');
   const clEnvTag    = fd.getAll('cluster_env_tag[]');
@@ -1534,9 +2494,11 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
       mongos_count: parseInt(clMongos[i]) || 2,
     };
     if (PLATFORM === 'docker') {
-      if (clPsmdb[i]) c.psmdb_image = `percona/percona-server-mongodb:${clPsmdb[i]}`;
-      if (clPbm[i])   c.pbm_image   = `percona/percona-backup-mongodb:${clPbm[i]}`;
-      if (clPmmClient[i]) c.pmm_client_image = `percona/pmm-client:${clPmmClient[i]}`;
+      const resolveDockerImg = (prefix, tag, customVal) =>
+        tag === '__custom__' ? (customVal || '') : (tag ? `${prefix}:${tag}` : '');
+      if (clPsmdb[i]) c.psmdb_image = resolveDockerImg('percona/percona-server-mongodb', clPsmdb[i], fd.getAll('cluster_psmdb_image_custom')[i]);
+      if (clPbm[i])   c.pbm_image   = resolveDockerImg('percona/percona-backup-mongodb', clPbm[i],   fd.getAll('cluster_pbm_image_custom')[i]);
+      if (clPmmClient[i]) c.pmm_client_image = resolveDockerImg('percona/pmm-client', clPmmClient[i], fd.getAll('cluster_pmm_client_image_custom')[i]);
       c.enable_pmm = clEnPmm.some((v,idx) => idx === i && v === '1');
       c.enable_pbm = clEnPbm.some((v,idx) => idx === i && v === '1');
       c.bind_to_localhost = clBind.some((v,idx) => idx === i && v === '1');
@@ -1549,6 +2511,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   const rsEnvTag  = fd.getAll('replset_env_tag[]');
   const rsNodes   = fd.getAll('replset_data_nodes[]');
   const rsArbiters= fd.getAll('replset_arbiters[]');
+  const rsPorts   = fd.getAll('replset_port[]');
   const rsPsmdb   = fd.getAll('replset_psmdb_image[]');
   const rsPbm     = fd.getAll('replset_pbm_image[]');
   const rsPmmClient = fd.getAll('replset_pmm_client_image[]');
@@ -1565,9 +2528,13 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
       arbiters_per_replset: parseInt(rsArbiters[i]) || 1,
     };
     if (PLATFORM === 'docker') {
-      if (rsPsmdb[i]) r.psmdb_image = `percona/percona-server-mongodb:${rsPsmdb[i]}`;
-      if (rsPbm[i])   r.pbm_image   = `percona/percona-backup-mongodb:${rsPbm[i]}`;
-      if (rsPmmClient[i]) r.pmm_client_image = `percona/pmm-client:${rsPmmClient[i]}`;
+      const resolveDockerImg = (prefix, tag, customVal) =>
+        tag === '__custom__' ? (customVal || '') : (tag ? `${prefix}:${tag}` : '');
+      const port = parseInt(rsPorts[i]);
+      if (port > 0) { r.replset_port = port; r.arbiter_port = port; }
+      if (rsPsmdb[i]) r.psmdb_image = resolveDockerImg('percona/percona-server-mongodb', rsPsmdb[i], fd.getAll('replset_psmdb_image_custom')[i]);
+      if (rsPbm[i])   r.pbm_image   = resolveDockerImg('percona/percona-backup-mongodb', rsPbm[i],   fd.getAll('replset_pbm_image_custom')[i]);
+      if (rsPmmClient[i]) r.pmm_client_image = resolveDockerImg('percona/pmm-client', rsPmmClient[i], fd.getAll('replset_pmm_client_image_custom')[i]);
       r.enable_pmm = rsEnPmm.some((v,idx) => idx === i && v === '1');
       r.enable_pbm = rsEnPbm.some((v,idx) => idx === i && v === '1');
       r.bind_to_localhost = rsBind.some((v,idx) => idx === i && v === '1');

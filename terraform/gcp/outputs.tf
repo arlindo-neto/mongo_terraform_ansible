@@ -33,10 +33,14 @@ resource "local_file" "AnsibleInventoryCluster" {
       bucket                   = google_storage_bucket.mongo-backups.name
       access_key               = google_storage_hmac_key.mongo-backup-service-account.access_id
       secret_access_key        = google_storage_hmac_key.mongo-backup-service-account.secret 
+      mongo_release            = var.mongo_release
+      mongo_version            = var.mongo_version
+      pbm_release              = var.pbm_release
+      pbm_version              = var.pbm_version
     }
   )
 
-  filename = "inventory_${each.key}"
+  filename = "${var.prefix}_inventory_${each.key}"
 }
 
 resource "local_file" "SSHConfigCluster" {
@@ -63,7 +67,7 @@ resource "local_file" "SSHConfigCluster" {
     pmm_port               = var.pmm_port    
   })
 
-  filename = "ssh_config_${each.key}"
+  filename = "${var.prefix}_ssh_config_${each.key}"
 }
 
 resource "local_file" "AnsibleInventoryRS" {
@@ -87,10 +91,14 @@ resource "local_file" "AnsibleInventoryRS" {
       bucket                   = google_storage_bucket.mongo-backups.name
       access_key               = google_storage_hmac_key.mongo-backup-service-account.access_id
       secret_access_key        = google_storage_hmac_key.mongo-backup-service-account.secret
+      mongo_release            = var.mongo_release
+      mongo_version            = var.mongo_version
+      pbm_release              = var.pbm_release
+      pbm_version              = var.pbm_version
     }
   )
 
-  filename = "inventory_${each.key}"
+  filename = "${var.prefix}_inventory_${each.key}"
 }
 
 resource "local_file" "SSHConfigRS" {
@@ -112,5 +120,5 @@ resource "local_file" "SSHConfigRS" {
     pmm_port               = var.pmm_port
   })
 
-  filename = "ssh_config_${each.key}"
+  filename = "${var.prefix}_ssh_config_${each.key}"
 }

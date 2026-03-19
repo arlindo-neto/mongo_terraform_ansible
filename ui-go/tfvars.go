@@ -72,23 +72,25 @@ func writeTfvars(envID, platform string, cfg Config) error {
 		writeOptStr("project_id", cfg.ProjectID)
 		writeOptStr("region", cfg.Region)
 		writeOptStr("location", cfg.Location)
-		writeOptStr("subnet_cidr", cfg.SubnetCIDR)
 		writeOptStr("source_ranges", cfg.SourceRanges)
 		writeOptStr("my_ssh_user", cfg.MySSHUser)
-		if platform == "aws" {
-			writeOptStr("ssh_public_key_path", cfg.SSHPublicKeyPath)
+		if platform != "chaos" {
+			writeOptStr("subnet_cidr", cfg.SubnetCIDR)
+			if platform == "aws" {
+				writeOptStr("ssh_public_key_path", cfg.SSHPublicKeyPath)
+			}
+			writeOptStr("default_key_pair", cfg.DefaultKeyPair)
+			writeOptStr("default_vpc_name", cfg.DefaultVpcName)
+			if cfg.EnableSSHGateway {
+				writeOptBool("enable_ssh_gateway", cfg.EnableSSHGateway)
+			}
+			writeOptStr("ssh_gateway_name", cfg.SSHGatewayName)
+			writeOptStr("port_to_forward", cfg.PortToForward)
+			if cfg.UseSpotInstances {
+				writeOptBool("use_spot_instances", cfg.UseSpotInstances)
+			}
+			writeOptInt("subnet_count", cfg.SubnetCount)
 		}
-		writeOptStr("default_key_pair", cfg.DefaultKeyPair)
-		writeOptStr("default_vpc_name", cfg.DefaultVpcName)
-		if cfg.EnableSSHGateway {
-			writeOptBool("enable_ssh_gateway", cfg.EnableSSHGateway)
-		}
-		writeOptStr("ssh_gateway_name", cfg.SSHGatewayName)
-		writeOptStr("port_to_forward", cfg.PortToForward)
-		if cfg.UseSpotInstances {
-			writeOptBool("use_spot_instances", cfg.UseSpotInstances)
-		}
-		writeOptInt("subnet_count", cfg.SubnetCount)
 
 		if len(cfg.SSHUsers) > 0 && platform == "azure" {
 			userKeys := make([]string, 0, len(cfg.SSHUsers))
@@ -117,68 +119,142 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write("}")
 		}
 
-		// PMM
-		writeOptStr("pmm_type", cfg.PmmType)
-		writeOptInt("pmm_volume_size", cfg.PmmVolumeSize)
-		writeOptInt("pmm_port", cfg.PmmPort)
-		writeOptStr("pmm_disk_type", cfg.PmmDiskType)
-		if cfg.EnablePmm != nil {
-			writeVar("enable_pmm", *cfg.EnablePmm)
-		}
+		// Package version vars – written for all cloud platforms so Terraform
+		// passes them into the inventory [all:vars] section instead of using --extra-vars.
+		writeOptStr("mongo_release", cfg.MongoRelease)
+		writeOptStr("mongo_version", cfg.MongoVersion)
+		writeOptStr("pbm_release", cfg.PbmRelease)
+		writeOptStr("pbm_version", cfg.PbmVersion)
 
-		// Backup
-		writeOptStr("default_bucket_name", cfg.DefaultBucketName)
-		writeOptStr("backup_retention", func() string {
-			if cfg.BackupRetention != 0 {
-				return strconv.Itoa(cfg.BackupRetention)
+		if platform == "chaos" {
+			// CHAOS-specific vars
+			// Note: chaos_api_token is intentionally NOT written to the tfvars file because
+			// it is sensitive. It is passed at runtime via the CHAOS_API_TOKEN environment
+			// variable (see handlers.go).
+			writeOptInt("delete_after_days", cfg.DeleteAfterDays)
+			writeOptStr("os_image", cfg.OsImage)
+			// Firewall rules: new structured per-rule list replaces source_ranges string.
+			// For backward compat, also write source_ranges if FirewallRules is empty.
+			if len(cfg.FirewallRules) > 0 {
+				write("")
+				write("firewall_rules = [")
+				for _, r := range cfg.FirewallRules {
+					comment := r.Comment
+					if comment == "" {
+						comment = "Custom access rule"
+					}
+					write("  {")
+					write(fmt.Sprintf("    source   = %s", formatHCLVal(r.CIDR)))
+					write(fmt.Sprintf("    port     = %s", formatHCLVal(r.Port)))
+					write(`    protocol = "tcp"`)
+					write(fmt.Sprintf("    comment  = %s", formatHCLVal(comment)))
+					write("  },")
+				}
+				write("]")
+			} else {
+				writeOptStr("source_ranges", cfg.SourceRanges)
 			}
-			return ""
-		}())
+			// PMM
+			if cfg.EnablePmm != nil {
+				writeVar("enable_pmm", *cfg.EnablePmm)
+			}
+			writeOptInt("pmm_port", cfg.PmmPort)
+			writeOptInt("pmm_volume_size", cfg.PmmVolumeSize)
+			writeOptInt("pmm_cpu_cores", cfg.PmmCpuCores)
+			writeOptInt("pmm_memory_gb", cfg.PmmMemoryGb)
+			// Minio
+			if cfg.EnableMinio != nil {
+				writeVar("enable_minio", *cfg.EnableMinio)
+			}
+			writeOptStr("minio_root_user", cfg.MinioRootUser)
+			writeOptStr("minio_root_password", cfg.MinioRootPassword)
+			writeOptInt("minio_port", cfg.MinioPort)
+			writeOptInt("minio_console_port", cfg.MinioConsolePort)
+			writeOptInt("minio_cpu_cores", cfg.MinioCpuCores)
+			writeOptInt("minio_memory_gb", cfg.MinioMemoryGb)
+			writeOptInt("minio_volume_size", cfg.MinioVolumeSize)
+			// Backup
+			writeOptStr("default_bucket_name", cfg.DefaultBucketName)
+			writeOptInt("backup_retention", cfg.BackupRetention)
+			// Per-component CPU/memory (CHAOS uses cpu_cores/memory_gb not instance types)
+			writeOptInt("shardsvr_cpu_cores", cfg.ShardsvrCpuCores)
+			writeOptInt("shardsvr_memory_gb", cfg.ShardsvrMemoryGb)
+			writeOptInt("shardsvr_volume_size", cfg.ShardsvrVolumeSize)
+			writeOptInt("configsvr_cpu_cores", cfg.ConfigsvrCpuCores)
+			writeOptInt("configsvr_memory_gb", cfg.ConfigsvrMemoryGb)
+			writeOptInt("configsvr_volume_size", cfg.ConfigsvrVolumeSize)
+			writeOptInt("mongos_cpu_cores", cfg.MongosCpuCores)
+			writeOptInt("mongos_memory_gb", cfg.MongosMemoryGb)
+			writeOptInt("arbiter_cpu_cores", cfg.ArbiterCpuCores)
+			writeOptInt("arbiter_memory_gb", cfg.ArbiterMemoryGb)
+			writeOptInt("replsetsvr_cpu_cores", cfg.ReplsetSvrCpuCores)
+			writeOptInt("replsetsvr_memory_gb", cfg.ReplsetSvrMemoryGb)
+			writeOptInt("replsetsvr_volume_size", cfg.ReplsetSvrVolumeSize)
+		} else {
+			// Non-CHAOS cloud vars
+			// PMM
+			writeOptStr("pmm_type", cfg.PmmType)
+			writeOptInt("pmm_volume_size", cfg.PmmVolumeSize)
+			writeOptInt("pmm_port", cfg.PmmPort)
+			writeOptStr("pmm_disk_type", cfg.PmmDiskType)
+			if cfg.EnablePmm != nil {
+				writeVar("enable_pmm", *cfg.EnablePmm)
+			}
 
-		// Per-component instance types and disk sizes
-		writeOptStr("data_disk_type", cfg.DataDiskType)
-		writeOptStr("shardsvr_type", cfg.ShardsvrType)
-		writeOptInt("shardsvr_volume_size", cfg.ShardsvrVolumeSize)
-		writeOptStr("configsvr_type", cfg.ConfigsvrType)
-		writeOptInt("configsvr_volume_size", cfg.ConfigsvrVolumeSize)
-		writeOptStr("mongos_type", cfg.MongosType)
-		writeOptStr("arbiter_type", cfg.ArbiterType)
-		writeOptStr("replsetsvr_type", cfg.ReplsetSvrType)
-		writeOptInt("replsetsvr_volume_size", cfg.ReplsetSvrVolumeSize)
+			// Backup
+			writeOptStr("default_bucket_name", cfg.DefaultBucketName)
+			writeOptStr("backup_retention", func() string {
+				if cfg.BackupRetention != 0 {
+					return strconv.Itoa(cfg.BackupRetention)
+				}
+				return ""
+			}())
 
-		regionKey := cfg.Region
-		if platform == "azure" {
-			regionKey = cfg.Location
-		}
-		if cfg.MachineImage != "" {
-			if platform == "gcp" {
+			// Per-component instance types and disk sizes
+			writeOptStr("data_disk_type", cfg.DataDiskType)
+			writeOptStr("shardsvr_type", cfg.ShardsvrType)
+			writeOptInt("shardsvr_volume_size", cfg.ShardsvrVolumeSize)
+			writeOptStr("configsvr_type", cfg.ConfigsvrType)
+			writeOptInt("configsvr_volume_size", cfg.ConfigsvrVolumeSize)
+			writeOptStr("mongos_type", cfg.MongosType)
+			writeOptStr("arbiter_type", cfg.ArbiterType)
+			writeOptStr("replsetsvr_type", cfg.ReplsetSvrType)
+			writeOptInt("replsetsvr_volume_size", cfg.ReplsetSvrVolumeSize)
+
+			regionKey := cfg.Region
+			if platform == "azure" {
+				regionKey = cfg.Location
+			}
+			if cfg.MachineImage != "" {
+				if platform == "gcp" {
+					write("")
+					writeVar("image", cfg.MachineImage)
+				} else if platform != "azure" && regionKey != "" {
+					write("")
+					write("image = {")
+					write(fmt.Sprintf("  %s = %s", formatHCLVal(regionKey), formatHCLVal(cfg.MachineImage)))
+					write("}")
+				}
+			}
+
+			if platform == "gcp" && cfg.SSHPublicKeyPath != "" && cfg.MySSHUser != "" {
+				merged := map[string]string{}
+				for k, v := range cfg.SSHUsers {
+					merged[k] = v
+				}
+				merged[cfg.MySSHUser] = cfg.SSHPublicKeyPath
+				mergedKeys := make([]string, 0, len(merged))
+				for k := range merged {
+					mergedKeys = append(mergedKeys, k)
+				}
+				sort.Strings(mergedKeys)
 				write("")
-				writeVar("image", cfg.MachineImage)
-			} else if platform != "azure" && regionKey != "" {
-				write("")
-				write("image = {")
-				write(fmt.Sprintf("  %s = %s", formatHCLVal(regionKey), formatHCLVal(cfg.MachineImage)))
+				write("gce_ssh_users = {")
+				for _, k := range mergedKeys {
+					write(fmt.Sprintf("  %s = %s", formatHCLVal(k), formatHCLVal(merged[k])))
+				}
 				write("}")
 			}
-		}
-
-		if platform == "gcp" && cfg.SSHPublicKeyPath != "" && cfg.MySSHUser != "" {
-			merged := map[string]string{}
-			for k, v := range cfg.SSHUsers {
-				merged[k] = v
-			}
-			merged[cfg.MySSHUser] = cfg.SSHPublicKeyPath
-			mergedKeys := make([]string, 0, len(merged))
-			for k := range merged {
-				mergedKeys = append(mergedKeys, k)
-			}
-			sort.Strings(mergedKeys)
-			write("")
-			write("gce_ssh_users = {")
-			for _, k := range mergedKeys {
-				write(fmt.Sprintf("  %s = %s", formatHCLVal(k), formatHCLVal(merged[k])))
-			}
-			write("}")
 		}
 	} else {
 		// Docker-only
@@ -234,6 +310,12 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write(fmt.Sprintf("    data_nodes_per_replset = %s", formatHCLVal(intDefault(r.DataNodesPerReplset, 2))))
 			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intDefault(r.ArbitersPerReplset, 1))))
 			if platform == "docker" {
+				if r.ReplsetPort != 0 {
+					write(fmt.Sprintf("    replset_port = %s", formatHCLVal(r.ReplsetPort)))
+				}
+				if r.ArbiterPort != 0 {
+					write(fmt.Sprintf("    arbiter_port = %s", formatHCLVal(r.ArbiterPort)))
+				}
 				if r.PsmdbImage != "" {
 					write(fmt.Sprintf("    psmdb_image = %s", formatHCLVal(r.PsmdbImage)))
 				}

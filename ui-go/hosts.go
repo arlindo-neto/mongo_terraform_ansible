@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,17 +34,6 @@ func collectDockerHosts(envID string, env *Environment) ([]HostInfo, []ServiceUR
 		return nil, nil, nil, "No containers found. Run Deploy first."
 	}
 
-	type dockerInspectNet struct {
-		IPAddress string `json:"IPAddress"`
-	}
-	type dockerInspectNetworks struct {
-		Networks map[string]dockerInspectNet `json:"Networks"`
-	}
-	type dockerInspectResult struct {
-		Name            string `json:"Name"`
-		NetworkSettings dockerInspectNetworks `json:"NetworkSettings"`
-	}
-
 	var hosts []HostInfo
 
 	names := strings.Split(strings.TrimSpace(out), "\n")
@@ -52,10 +42,32 @@ func collectDockerHosts(envID string, env *Environment) ([]HostInfo, []ServiceUR
 		if name == "" {
 			continue
 		}
+		// Skip transient init containers – they exit immediately after setup and
+		// have no useful IP or connect command to show the user.
+		if strings.HasSuffix(name, "-init_keyfile_container") {
+			continue
+		}
+		// Use a newline separator so that containers attached to multiple Docker
+		// networks (e.g. pmm-client sidecars that sit on both the default bridge
+		// and the custom network) don't produce a concatenated, unparseable IP
+		// string like "172.17.0.3172.20.0.5".  We take the first non-empty value.
 		ipOut, err := execOutput("docker", "inspect",
-			"--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name)
-		ip := strings.TrimSpace(ipOut)
-		if err != nil || ip == "" {
+			"--format", "{{range .NetworkSettings.Networks}}{{if .IPAddress}}{{.IPAddress}}\n{{end}}{{end}}", name)
+		ip := ""
+		for _, line := range strings.Split(ipOut, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				ip = line
+				break
+			}
+		}
+		if (err != nil || ip == "") && env.HostIPs != nil {
+			// Container is stopped – fall back to the last-known IP so the UI
+			// continues to show meaningful addresses.
+			if cached, ok := env.HostIPs[name]; ok && cached != "" && cached != "—" {
+				ip = cached
+			}
+		}
+		if ip == "" {
 			ip = "—"
 		}
 		connectCmd := fmt.Sprintf("docker exec -it %s bash", name)
@@ -124,20 +136,26 @@ func buildDockerMongoConns(envID string, env *Environment) []MongoConnInfo {
 	prefix := strDefault(env.Config.Prefix, envID)
 	host := "localhost"
 	user, pass := mongoAdminCredentials(env)
+	encodedPass := url.QueryEscape(pass)
 	var conns []MongoConnInfo
 
 	for name := range env.Config.Replsets {
 		containerPrefix := prefix + "-" + name
-		count := env.Config.Replsets[name].DataNodesPerReplset
+		rs := env.Config.Replsets[name]
+		count := rs.DataNodesPerReplset
 		if count == 0 {
 			count = 2
 		}
+		basePort := rs.ReplsetPort
+		if basePort == 0 {
+			basePort = 27017
+		}
 		var members []string
 		for i := 0; i < count; i++ {
-			members = append(members, fmt.Sprintf("%s:%d", host, 27017+i))
+			members = append(members, fmt.Sprintf("%s:%d", host, basePort+i))
 		}
 		connStr := fmt.Sprintf("mongodb://%s:%s@%s/?replicaSet=%s&authSource=admin",
-			user, pass, strings.Join(members, ","), containerPrefix)
+			url.QueryEscape(user), encodedPass, strings.Join(members, ","), containerPrefix)
 		conns = append(conns, MongoConnInfo{
 			Name:       name,
 			Type:       "replset",
@@ -157,7 +175,7 @@ func buildDockerMongoConns(envID string, env *Environment) []MongoConnInfo {
 			mongosHosts = append(mongosHosts, fmt.Sprintf("%s:%d", host, 27017+i))
 		}
 		connStr := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=admin",
-			user, pass, strings.Join(mongosHosts, ","))
+			url.QueryEscape(user), encodedPass, strings.Join(mongosHosts, ","))
 		conns = append(conns, MongoConnInfo{
 			Name:       name,
 			Type:       "cluster",
@@ -199,8 +217,9 @@ func collectCloudHosts(envID string, env *Environment) ([]HostInfo, []MongoConnI
 	sort.Strings(names)
 
 	var hosts []HostInfo
+	filePrefix := strDefault(env.Config.Prefix, envID)
 	for _, name := range names {
-		p := filepath.Join(tfDir, "inventory_"+name)
+		p := filepath.Join(tfDir, filePrefix+"_inventory_"+name)
 		content, err := os.ReadFile(p)
 		if err != nil {
 			continue
@@ -211,6 +230,7 @@ func collectCloudHosts(envID string, env *Environment) ([]HostInfo, []MongoConnI
 
 	var mongoConns []MongoConnInfo
 	user, pass := mongoAdminCredentials(env)
+	encodedPass := url.QueryEscape(pass)
 	for _, name := range names {
 		if _, ok := env.Config.Clusters[name]; ok {
 			mongosHosts := hostsWithRole(hosts, name, "mongos")
@@ -220,7 +240,7 @@ func collectCloudHosts(envID string, env *Environment) ([]HostInfo, []MongoConnI
 					members = append(members, h.IP+":27017")
 				}
 				connStr := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=admin",
-					user, pass, strings.Join(members, ","))
+					url.QueryEscape(user), encodedPass, strings.Join(members, ","))
 				mongoConns = append(mongoConns, MongoConnInfo{
 					Name:       name,
 					Type:       "cluster",
@@ -237,7 +257,7 @@ func collectCloudHosts(envID string, env *Environment) ([]HostInfo, []MongoConnI
 					members = append(members, h.IP+":27017")
 				}
 				connStr := fmt.Sprintf("mongodb://%s:%s@%s/?replicaSet=%s&authSource=admin",
-					user, pass, strings.Join(members, ","), name)
+					url.QueryEscape(user), encodedPass, strings.Join(members, ","), name)
 				mongoConns = append(mongoConns, MongoConnInfo{
 					Name:       name,
 					Type:       "replset",
@@ -306,6 +326,17 @@ func parseInventoryHosts(content, group, sshUser string) []HostInfo {
 			role = "arbiter"
 		case strings.Contains(sec, "pmm"):
 			role = "pmm"
+		case strings.Contains(sec, "minio"):
+			role = "minio"
+		}
+		// Service hosts (minio, pmm) get their own logical group so they appear in
+		// a separate subsection rather than inside the replica-set/cluster group.
+		hostGroup := group
+		switch role {
+		case "minio":
+			hostGroup = "Minio"
+		case "pmm":
+			hostGroup = "PMM"
 		}
 		sshCmd := fmt.Sprintf("ssh %s@%s", sshUser, ip)
 		hosts = append(hosts, HostInfo{
@@ -313,7 +344,7 @@ func parseInventoryHosts(content, group, sshUser string) []HostInfo {
 			IP:         ip,
 			ConnectCmd: sshCmd,
 			Role:       role,
-			Group:      group,
+			Group:      hostGroup,
 		})
 	}
 	return hosts
@@ -358,6 +389,81 @@ func configServiceURLs(envID string, env *Environment) []ServiceURL {
 				Name:  prefix + "-" + svcName,
 				Label: "MinIO Console: " + svcName,
 				URL:   fmt.Sprintf("http://%s:%d", host, consolePort),
+			})
+		}
+	} else if env.Platform == "chaos" {
+		// CHAOS: Minio console access URL is derived from inventory files.
+		// We look for the minio host in the inventory files.
+		tfDir := filepath.Join(terraformDir, "chaos")
+		var names []string
+		for name := range env.Config.Clusters {
+			names = append(names, name)
+		}
+		for name := range env.Config.Replsets {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		minioHost := ""
+		minioIP := ""
+		filePrefix2 := strDefault(env.Config.Prefix, envID)
+		for _, name := range names {
+			p := filepath.Join(tfDir, filePrefix2+"_inventory_"+name)
+			content, err := os.ReadFile(p)
+			if err != nil {
+				continue
+			}
+			// Find the minio group and its host
+			inMinio := false
+			for _, line := range strings.Split(string(content), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "[minio]" {
+					inMinio = true
+					continue
+				}
+				if strings.HasPrefix(line, "[") {
+					inMinio = false
+					continue
+				}
+				if inMinio && line != "" {
+					parts := strings.Fields(line)
+					minioHost = parts[0]
+					for _, kv := range parts[1:] {
+						if strings.HasPrefix(kv, "ansible_host=") {
+							minioIP = strings.TrimPrefix(kv, "ansible_host=")
+						}
+					}
+					break
+				}
+			}
+			if minioHost != "" {
+				break
+			}
+		}
+		if minioHost != "" || minioIP != "" {
+			host := minioIP
+			if host == "" {
+				host = minioHost
+			}
+			consolePort := env.Config.MinioConsolePort
+			if consolePort == 0 {
+				consolePort = 9001
+			}
+			urls = append(urls, ServiceURL{
+				Name:  "minio",
+				Label: "MinIO Console",
+				URL:   fmt.Sprintf("http://%s:%d", host, consolePort),
+			})
+		}
+		// PMM URL for CHAOS (via SSH port forward like other cloud platforms)
+		if v := env.Config.EnablePmm; v != nil && *v {
+			portStr := env.Config.PortToForward
+			if portStr == "" {
+				portStr = "23443"
+			}
+			urls = append(urls, ServiceURL{
+				Name:  "pmm",
+				Label: "PMM",
+				URL:   fmt.Sprintf("https://127.0.0.1:%s", portStr),
 			})
 		}
 	} else {

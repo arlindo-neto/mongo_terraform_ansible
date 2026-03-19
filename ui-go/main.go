@@ -18,16 +18,13 @@ import (
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-var platforms = []string{"aws", "gcp", "azure", "docker"}
+var platforms = []string{"aws", "gcp", "azure", "chaos", "docker"}
 
 var ansiRe = regexp.MustCompile(`\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])`)
 var safeFilenameRe = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
 
 // defaultPSMDBVersions is used as a fallback when the Percona repo is unreachable.
 var defaultPSMDBVersions = []string{"psmdb-80", "psmdb-70", "psmdb-60", "psmdb-50", "psmdb-44", "psmdb-42", "psmdb-40", "psmdb-36"}
-
-// defaultPBMReleases is used as a fallback when the Percona repo is unreachable.
-var defaultPBMReleases = []string{"pbm-30", "pbm-20", "pbm-12", "pbm-11", "pbm-10"}
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 

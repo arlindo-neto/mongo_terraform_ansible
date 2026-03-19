@@ -2,6 +2,13 @@ package main
 
 import "sort"
 
+// ChaosFirewallRule is a single ingress rule for CHAOS deployments.
+type ChaosFirewallRule struct {
+	CIDR    string `json:"cidr"`
+	Port    string `json:"port"`
+	Comment string `json:"comment,omitempty"`
+}
+
 // ClusterConfig maps to the Terraform "clusters" map object type.
 type ClusterConfig struct {
 	EnvTag            string `json:"env_tag"`
@@ -24,6 +31,10 @@ type ReplsetConfig struct {
 	EnvTag             string `json:"env_tag"`
 	DataNodesPerReplset int   `json:"data_nodes_per_replset"`
 	ArbitersPerReplset  int   `json:"arbiters_per_replset"`
+	// Docker-only port assignment: starting port for data nodes and arbiters.
+	// Auto-assigned on save to avoid collisions between multiple replica sets.
+	ReplsetPort    int    `json:"replset_port,omitempty"`
+	ArbiterPort    int    `json:"arbiter_port,omitempty"`
 	// Docker-only
 	PsmdbImage     string `json:"psmdb_image,omitempty"`
 	PbmImage       string `json:"pbm_image,omitempty"`
@@ -70,8 +81,10 @@ type LdapServerConfig struct {
 type Config struct {
 	// General
 	Prefix       string `json:"prefix"`
-	MongoRelease string `json:"mongo_release,omitempty"`
-	PbmRelease   string `json:"pbm_release,omitempty"`
+	MongoRelease  string `json:"mongo_release,omitempty"`
+	MongoVersion  string `json:"mongo_version,omitempty"`
+	PbmRelease    string `json:"pbm_release,omitempty"`
+	PbmVersion    string `json:"pbm_version,omitempty"`
 
 	// Cloud credentials / settings
 	ProjectID        string `json:"project_id,omitempty"`
@@ -106,6 +119,34 @@ type Config struct {
 
 	// Machine image / AMI selected for cloud instances.
 	MachineImage string `json:"machine_image,omitempty"`
+
+	// CHAOS-specific settings
+	ChaosApiToken    string `json:"chaos_api_token,omitempty"`
+	EnableMinio      *bool  `json:"enable_minio,omitempty"`
+	DeleteAfterDays  int    `json:"delete_after_days,omitempty"`
+	OsImage          string `json:"os_image,omitempty"`
+	// FirewallRules replaces the old SourceRanges single string for CHAOS.
+	// Each entry is an independent ingress rule with its own CIDR and port.
+	FirewallRules    []ChaosFirewallRule `json:"firewall_rules,omitempty"`
+	ShardsvrCpuCores int    `json:"shardsvr_cpu_cores,omitempty"`
+	ShardsvrMemoryGb int    `json:"shardsvr_memory_gb,omitempty"`
+	ConfigsvrCpuCores int   `json:"configsvr_cpu_cores,omitempty"`
+	ConfigsvrMemoryGb int   `json:"configsvr_memory_gb,omitempty"`
+	MongosCpuCores   int    `json:"mongos_cpu_cores,omitempty"`
+	MongosMemoryGb   int    `json:"mongos_memory_gb,omitempty"`
+	ArbiterCpuCores  int    `json:"arbiter_cpu_cores,omitempty"`
+	ArbiterMemoryGb  int    `json:"arbiter_memory_gb,omitempty"`
+	ReplsetSvrCpuCores int  `json:"replsetsvr_cpu_cores,omitempty"`
+	ReplsetSvrMemoryGb int  `json:"replsetsvr_memory_gb,omitempty"`
+	MinioCpuCores    int    `json:"minio_cpu_cores,omitempty"`
+	MinioMemoryGb    int    `json:"minio_memory_gb,omitempty"`
+	MinioVolumeSize  int    `json:"minio_volume_size,omitempty"`
+	MinioPort        int    `json:"minio_port,omitempty"`
+	MinioConsolePort int    `json:"minio_console_port,omitempty"`
+	MinioRootUser    string `json:"minio_root_user,omitempty"`
+	MinioRootPassword string `json:"minio_root_password,omitempty"`
+	PmmCpuCores      int    `json:"pmm_cpu_cores,omitempty"`
+	PmmMemoryGb      int    `json:"pmm_memory_gb,omitempty"`
 
 	// Per-component instance types and disk sizes (cloud platforms only).
 	ShardsvrType        string `json:"shardsvr_type,omitempty"`
@@ -144,13 +185,17 @@ type HistoryEvent struct {
 
 // Environment is one record in the state file.
 type Environment struct {
-	Platform  string         `json:"platform"`
-	Config    Config         `json:"config"`
-	Status    string         `json:"status"`
-	CreatedAt string         `json:"created_at"`
-	UpdatedAt string         `json:"updated_at"`
-	LastJobID string         `json:"last_job_id,omitempty"`
-	History   []HistoryEvent `json:"history,omitempty"`
+	Platform  string            `json:"platform"`
+	Config    Config            `json:"config"`
+	Status    string            `json:"status"`
+	CreatedAt string            `json:"created_at"`
+	UpdatedAt string            `json:"updated_at"`
+	LastJobID string            `json:"last_job_id,omitempty"`
+	History   []HistoryEvent    `json:"history,omitempty"`
+	// HostIPs caches the last-known IP address for each Docker container so
+	// that the UI can continue to display addresses even when containers are
+	// stopped (and docker inspect returns an empty IP).
+	HostIPs   map[string]string `json:"host_ips,omitempty"`
 }
 
 // ─── Named pair helpers (sorted map iteration for templates) ──────────────────
@@ -261,12 +306,19 @@ type ConfigureData struct {
 	Platform        string
 	EnvID           string
 	Config          Config
+	OSUser          string // current OS user, used as SSH user default
 	PSMDBVersions   []string
+	// PBMVersions holds a flat sorted-descending list of all available PBM package
+	// versions (e.g. ["2.7.0", "2.6.1", "2.6.0", ...]). PBM uses a single Percona
+	// repository so there is no per-major-version grouping.
 	PBMVersions     []string
-	PMMImages       []string
-	PSMDBImages     []string
-	PBMImages       []string
-	PMMClientImages []string
+	// PSMDBMinorVersions maps major release key → sorted minor versions
+	// e.g. {"psmdb-70": ["7.0.12", "7.0.11", ...]}
+	PSMDBMinorVersions map[string][]string
+	PMMImages          []string
+	PSMDBImages        []string
+	PBMImages          []string
+	PMMClientImages    []string
 	// Pre-sorted for templates
 	SortedClusters   []NamedCluster
 	SortedReplsets   []NamedReplset

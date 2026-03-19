@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -75,21 +76,32 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get current OS user for SSH user field default.
+	osUser := ""
+	if u, err := user.Current(); err == nil {
+		osUser = u.Username
+	}
+	if osUser == "" {
+		osUser = os.Getenv("USER")
+	}
+
 	renderPage(w, "configure", ConfigureData{
-		Platform:         platform,
-		EnvID:            envID,
-		Config:           cfg,
-		PSMDBVersions:    getPSMDBVersions(),
-		PBMVersions:      getPBMReleases(),
-		PMMImages:        getPMMServerImages(),
-		PSMDBImages:      getPSMDBImages(),
-		PBMImages:        getPBMImages(),
-		PMMClientImages:  getPMMClientImages(),
-		SortedClusters:   sortedClusters(cfg.Clusters),
-		SortedReplsets:   sortedReplsets(cfg.Replsets),
-		SortedPmmServers: sortedPmmServers(cfg.PmmServers),
-		SortedMinio:      sortedMinioServers(cfg.MinioServers),
-		SortedLdap:       sortedLdapServers(cfg.LdapServers),
+		Platform:           platform,
+		EnvID:              envID,
+		Config:             cfg,
+		OSUser:             osUser,
+		PSMDBVersions:      cachedPSMDBVersions(),
+		PBMVersions:        cachedPBMVersions(),
+		PSMDBMinorVersions: cachedPSMDBMinorVersionsByMajor(),
+		PMMImages:          cachedPMMServerImages(),
+		PSMDBImages:        cachedPSMDBImages(),
+		PBMImages:          cachedPBMImages(),
+		PMMClientImages:    cachedPMMClientImages(),
+		SortedClusters:     sortedClusters(cfg.Clusters),
+		SortedReplsets:     sortedReplsets(cfg.Replsets),
+		SortedPmmServers:   sortedPmmServers(cfg.PmmServers),
+		SortedMinio:        sortedMinioServers(cfg.MinioServers),
+		SortedLdap:         sortedLdapServers(cfg.LdapServers),
 	})
 }
 
@@ -114,12 +126,13 @@ func environmentHandler(w http.ResponseWriter, r *http.Request) {
 // GET /api/versions
 func apiVersionsHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]interface{}{
-		"psmdb_versions":    getPSMDBVersions(),
-		"pbm_releases":      getPBMReleases(),
-		"pmm_server_images": getPMMServerImages(),
-		"psmdb_images":      getPSMDBImages(),
-		"pbm_images":        getPBMImages(),
-		"pmm_client_images": getPMMClientImages(),
+		"psmdb_versions":       getPSMDBVersions(),
+		"pbm_versions":         getPBMVersions(),
+		"pmm_server_images":    getPMMServerImages(),
+		"psmdb_images":         getPSMDBImages(),
+		"pbm_images":           getPBMImages(),
+		"pmm_client_images":    getPMMClientImages(),
+		"psmdb_minor_versions": getPSMDBMinorVersionsByMajor(),
 	})
 }
 
@@ -215,6 +228,18 @@ func saveEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 	if !validPlatform(payload.Platform) {
 		jsonError(w, 400, "invalid platform")
 		return
+	}
+
+	// Default the prefix to the environment name for all platforms so resources
+	// are namespaced consistently. Users can override this in the form.
+	if payload.Config.Prefix == "" {
+		payload.Config.Prefix = payload.EnvID
+	}
+
+	// For Docker deployments, auto-assign unique port ranges to replica sets
+	// that don't yet have a port assigned, to prevent collisions.
+	if payload.Platform == "docker" {
+		assignDockerReplsetPorts(&payload.Config)
 	}
 
 	state, _ := loadState()
@@ -346,14 +371,15 @@ func getInventoryHandler(w http.ResponseWriter, r *http.Request) {
 		Name    string `json:"name"`
 		Content string `json:"content"`
 	}
+	filePrefix := strDefault(env.Config.Prefix, envID)
 	var files []invFile
 	for _, name := range names {
-		p := filepath.Join(tfDir, "inventory_"+name)
+		p := filepath.Join(tfDir, filePrefix+"_inventory_"+name)
 		content, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
-		files = append(files, invFile{Name: "inventory_" + name, Content: string(content)})
+		files = append(files, invFile{Name: filePrefix + "_inventory_" + name, Content: string(content)})
 	}
 
 	if len(files) == 0 {
@@ -387,6 +413,27 @@ func getHostsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if env.Platform == "docker" {
 		hosts, serviceURLs, mongoConns, msg = collectDockerHosts(envID, env)
+		// Persist any newly discovered IPs so they survive container stop.
+		if len(hosts) > 0 {
+			updated := false
+			if env.HostIPs == nil {
+				env.HostIPs = make(map[string]string)
+			}
+			for _, h := range hosts {
+				if h.IP != "" && h.IP != "—" {
+					if env.HostIPs[h.Name] != h.IP {
+						env.HostIPs[h.Name] = h.IP
+						updated = true
+					}
+				}
+			}
+			if updated {
+				state[envID] = env
+				saveState(state) //nolint:errcheck
+			}
+			// Keep local SSH config in sync so container names can be resolved.
+			updateDockerSSHConfig(envID, hosts)
+		}
 	} else {
 		hosts, mongoConns, msg = collectCloudHosts(envID, env)
 		serviceURLs = configServiceURLs(envID, env)
@@ -442,14 +489,16 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(invNames)
 
+	// filePrefix is prepended to generated inventory and ssh_config filenames so
+	// that multiple environments sharing the same Terraform directory do not
+	// overwrite each other's files (e.g. "myenv_inventory_cl01").
+	filePrefix := strDefault(env.Config.Prefix, envID)
+
 	cloudAnsibleCmd := func(playbookPath string, waitForSSH bool) string {
 		effectiveVars := make(map[string]string)
-		if env.Config.MongoRelease != "" {
-			effectiveVars["mongo_release"] = env.Config.MongoRelease
-		}
-		if env.Config.PbmRelease != "" {
-			effectiveVars["pbm_release"] = env.Config.PbmRelease
-		}
+		// Note: mongo_release, mongo_version, pbm_release, pbm_version are now written
+		// into the inventory [all:vars] section via Terraform variables, so they are
+		// not included here in --extra-vars.
 		for k, v := range env.Config.AnsibleVars {
 			effectiveVars[k] = v
 		}
@@ -477,7 +526,7 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 
 		var b strings.Builder
 		for _, name := range invNames {
-			inv := shellQuote("inventory_" + name)
+			inv := shellQuote(filePrefix + "_inventory_" + name)
 			b.WriteString(fmt.Sprintf(
 				`{ [ -f %[1]s ] || { printf "ERROR: inventory file %%s not found\n" %[1]s; exit 1; }; `,
 				inv,
@@ -517,7 +566,7 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 		b.WriteString(`[ -f "${_sshcfg}" ] || touch "${_sshcfg}"; `)
 		b.WriteString(`chmod 600 "${_sshcfg}"; `)
 		for _, name := range invNames {
-			src := shellQuote("ssh_config_" + name)
+			src := shellQuote(filePrefix + "_ssh_config_" + name)
 			begin := shellQuote("# BEGIN mongodeploy:" + envID + ":" + name)
 			end := shellQuote("# END mongodeploy:" + envID + ":" + name)
 			b.WriteString(fmt.Sprintf(
@@ -670,6 +719,9 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 			if status == "success" {
 				e.Status = "deleted"
 				os.Remove(varfile)
+				if platform == "docker" {
+					removeDockerSSHConfig(envID)
+				}
 			} else {
 				e.Status = "destroy_failed"
 			}
@@ -700,7 +752,14 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 		saveState(st)
 	}
 
-	jobID := startJob(cmd, tfDir, nil, onComplete)
+	jobID := startJob(cmd, tfDir, func() map[string]string {
+		// For CHAOS environments, pass the API token via an environment variable so
+		// it is never written to the tfvars file on disk.
+		if platform == "chaos" && env.Config.ChaosApiToken != "" {
+			return map[string]string{"CHAOS_API_TOKEN": env.Config.ChaosApiToken}
+		}
+		return nil
+	}(), onComplete)
 
 	env.Status = action + "_in_progress"
 	env.LastJobID = jobID
@@ -827,4 +886,38 @@ func jobLogHandler(w http.ResponseWriter, r *http.Request) {
 		status = "unknown"
 	}
 	writeJSON(w, 200, map[string]string{"log": stripAnsi(string(content)), "status": status})
+}
+
+// assignDockerReplsetPorts auto-assigns unique port ranges to Docker replica
+// sets that don't yet have a replset_port set, to avoid collisions when
+// multiple replica sets are deployed in the same Docker environment.
+// Each replica set receives a block of 20 ports (enough for 7 data nodes + 3
+// arbiters). Existing non-zero port assignments are preserved; only zero-valued
+// ones receive a new assignment starting above the current maximum.
+func assignDockerReplsetPorts(cfg *Config) {
+if len(cfg.Replsets) == 0 {
+return
+}
+// Find the highest already-assigned port.
+maxPort := 27017 - 20
+for _, nr := range sortedReplsets(cfg.Replsets) {
+if nr.Config.ReplsetPort > maxPort {
+maxPort = nr.Config.ReplsetPort
+}
+}
+nextPort := maxPort + 20
+if nextPort < 27017 {
+nextPort = 27017
+}
+for _, nr := range sortedReplsets(cfg.Replsets) {
+rs := cfg.Replsets[nr.Name]
+if rs.ReplsetPort == 0 {
+rs.ReplsetPort = nextPort
+rs.ArbiterPort = nextPort
+nextPort += 20
+} else if rs.ArbiterPort == 0 {
+rs.ArbiterPort = rs.ReplsetPort
+}
+cfg.Replsets[nr.Name] = rs
+}
 }
