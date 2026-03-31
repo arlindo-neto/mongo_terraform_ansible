@@ -15,25 +15,23 @@
     <h2>General</h2>
     <div class="form-row">
       <div class="form-group">
-        <label for="env_id_field">Name</label>
+        <label for="env_id_field">Name <span class="field-tip" data-tip="Unique identifier for this environment. Leave blank to auto-generate. Also used as the tfvars filename prefix.">ⓘ</span></label>
         <input type="text" id="env_id_field" name="env_id" placeholder="e.g. dev01"
                value="{{.EnvID}}" maxlength="20" pattern="[a-zA-Z0-9_-]+"
                title="Alphanumeric, hyphens and underscores only">
-        <small>Leave blank to auto-generate. Used as tfvars filename prefix.</small>
       </div>
       <div class="form-group">
-        <label for="prefix">Resource Prefix</label>
+        <label for="prefix">Resource Prefix <span class="field-tip" data-tip="Prefix applied to all created resources to avoid naming collisions. Defaults to the environment name.">ⓘ</span></label>
         <input type="text" id="prefix" name="prefix"
                value="{{strDefault .Config.Prefix .EnvID}}"
                placeholder="{{.EnvID}}">
-        <small>{{if eq $p "docker"}}Prefix applied to all Docker containers, volumes and network. Defaults to environment name.{{else}}Prefix applied to all cloud resources to avoid naming collisions. Defaults to environment name.{{end}}</small>
       </div>
     </div>
 
     {{if ne $p "docker"}}
     <div class="form-row">
       <div class="form-group">
-        <label for="mongo_release">MongoDB Major Version</label>
+        <label for="mongo_release">MongoDB Major Version <span class="field-tip" data-tip="Percona repository identifier – selects the major MongoDB release line to install.">ⓘ</span></label>
         <select id="mongo_release" name="mongo_release"
                 onchange="onMongoReleaseChange(this)">
           {{$cur := .Config.MongoRelease}}
@@ -41,10 +39,9 @@
           <option value="{{.}}" {{if eq $cur .}}selected{{end}}>{{.}}</option>
           {{end}}
         </select>
-        <small>Percona repository identifier – selects the major MongoDB release line.</small>
       </div>
       <div class="form-group">
-        <label for="mongo_version">MongoDB Specific Version</label>
+        <label for="mongo_version">MongoDB Specific Version <span class="field-tip" data-tip="Optional: pin to a specific version (e.g., 7.0.12). Leave empty to install the latest available in the selected major release.">ⓘ</span></label>
         <select id="mongo_version" name="mongo_version">
           <option value="">latest (default)</option>
           {{$curVer := .Config.MongoVersion}}
@@ -56,12 +53,11 @@
             {{end}}
           {{end}}
         </select>
-        <small>Optional: pin to a specific version (e.g., 7.0.12). Leave empty to install the latest available in the selected major release.</small>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="pbm_version">PBM Version</label>
+        <label for="pbm_version">PBM Version <span class="field-tip" data-tip="Optional: pin to a specific PBM version (e.g., 2.7.0). Leave empty to install the latest.">ⓘ</span></label>
         <select id="pbm_version" name="pbm_version">
           <option value="">latest (default)</option>
           {{$curPbmVer := .Config.PbmVersion}}
@@ -69,7 +65,6 @@
           <option value="{{.}}" {{if eq $curPbmVer .}}selected{{end}}>{{.}}</option>
           {{end}}
         </select>
-        <small>Optional: pin to a specific PBM version (e.g., 2.7.0). Leave empty to install the latest.</small>
       </div>
     </div>
     {{end}}
@@ -81,12 +76,12 @@
     <h2>GCP Settings</h2>
     <div class="form-row">
       <div class="form-group">
-        <label for="project_id">GCP Project ID</label>
+        <label for="project_id">GCP Project ID <span class="field-tip" data-tip="Your GCP project ID used for all Terraform resources.">ⓘ</span></label>
         <input type="text" id="project_id" name="project_id"
                value="{{.Config.ProjectID}}" placeholder="my-gcp-project">
       </div>
       <div class="form-group">
-        <label for="region">Region</label>
+        <label for="region">Region <span class="field-tip" data-tip="GCP region where all resources will be deployed.">ⓘ</span></label>
         <select id="region" name="region" onchange="onRegionChange()">
           <option value="">— loading regions… —</option>
           {{if .Config.Region}}<option value="{{.Config.Region}}" selected>{{.Config.Region}}</option>{{end}}
@@ -96,21 +91,19 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="my_ssh_user">Default SSH User</label>
+        <label for="my_ssh_user">Default SSH User <span class="field-tip" data-tip="Primary username Ansible uses to connect to instances (also used to generate ssh_config).">ⓘ</span></label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
                value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{.OSUser}}">
-        <small>Primary username Ansible uses to connect to instances (also used to generate ssh_config).</small>
       </div>
       <div class="form-group">
-        <label for="default_vpc_name">VPC Name</label>
+        <label for="default_vpc_name">VPC Name <span class="field-tip" data-tip="Base name for the VPC (full name = prefix-vpc_name).">ⓘ</span></label>
         <input type="text" id="default_vpc_name" name="default_vpc_name"
                value="{{strDefault .Config.DefaultVpcName "mongo"}}" placeholder="mongo">
-        <small>Base name for the VPC (full name = prefix-vpc_name).</small>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>SSH Public Key for Default User</label>
+        <label>SSH Public Key for Default User <span class="field-tip" data-tip="Public key added to every GCP instance for the default SSH user.">ⓘ</span></label>
         <div class="file-picker-row">
           <span id="ssh-key-filename" class="file-picker-name">{{if .Config.SSHPublicKeyPath}}{{.Config.SSHPublicKeyPath}}{{else}}No file selected{{end}}</span>
           <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('ssh_key_file_input').click()">Browse…</button>
@@ -119,10 +112,9 @@
                onchange="uploadSSHKey(this)">
         <input type="hidden" id="ssh_public_key_path" name="ssh_public_key_path"
                value="{{.Config.SSHPublicKeyPath}}">
-        <small>Public key added to every GCP instance for the default SSH user (<code>gce_ssh_users</code>).</small>
       </div>
       <div class="form-group">
-        <label for="subnet_cidr">Subnet CIDR</label>
+        <label for="subnet_cidr">Subnet CIDR <span class="field-tip" data-tip="CIDR block for the VPC subnet (e.g. 10.128.0.0/20).">ⓘ</span></label>
         <input type="text" id="subnet_cidr" name="subnet_cidr"
                value="{{strDefault .Config.SubnetCIDR "10.128.0.0/20"}}">
       </div>
@@ -130,7 +122,7 @@
     <!-- Machine Image -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label for="machine_image">Machine Image</label>
+        <label for="machine_image">Machine Image <span class="field-tip" data-tip="GCP image used for all instances. Select from available images or choose Custom… to enter a full image path.">ⓘ</span></label>
         <div style="display:flex;gap:0.5rem;align-items:center">
           <select id="machine_image" name="machine_image" style="flex:1"
                   onchange="toggleMachineImageCustom(this)">
@@ -150,10 +142,7 @@
     <!-- gce_ssh_users: additional users whose public keys are provisioned on every instance -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label>Additional SSH Users</label>
-        <small style="margin-bottom:0.4rem">
-          Builds the <code>gce_ssh_users</code> Terraform variable — adds public keys for each listed user to every GCP instance.
-        </small>
+        <label>Additional SSH Users <span class="field-tip" data-tip="Builds the gce_ssh_users Terraform variable — adds public keys for each listed user to every GCP instance.">ⓘ</span></label>
         <div id="ssh-users-container">
           {{range $user, $key := .Config.SSHUsers}}
           <div class="ssh-user-row">
@@ -177,7 +166,7 @@
     <h2>AWS Settings</h2>
     <div class="form-row">
       <div class="form-group">
-        <label for="region">Region</label>
+        <label for="region">Region <span class="field-tip" data-tip="AWS region where all resources will be deployed.">ⓘ</span></label>
         <select id="region" name="region" onchange="onRegionChange()">
           <option value="">— loading regions… —</option>
           {{if .Config.Region}}<option value="{{.Config.Region}}" selected>{{.Config.Region}}</option>{{end}}
@@ -185,15 +174,14 @@
         <small><a href="#" onclick="reloadRegions(event)">↻ Refresh from AWS</a></small>
       </div>
       <div class="form-group">
-        <label for="my_ssh_user">Default SSH User</label>
+        <label for="my_ssh_user">Default SSH User <span class="field-tip" data-tip="Primary username Ansible uses to SSH into instances.">ⓘ</span></label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
                value="{{strDefault .Config.MySSHUser "ec2-user"}}" placeholder="{{strDefault .OSUser "ec2-user"}}">
-        <small>Primary username Ansible uses to connect (e.g. ec2-user for CentOS, ubuntu for Ubuntu).</small>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>SSH Public Key File</label>
+        <label>SSH Public Key File <span class="field-tip" data-tip="Public key uploaded to AWS as an EC2 Key Pair and used by Terraform/Ansible to connect.">ⓘ</span></label>
         <div class="file-picker-row">
           <span id="ssh-key-filename" class="file-picker-name">{{if .Config.SSHPublicKeyPath}}{{.Config.SSHPublicKeyPath}}{{else}}No file selected{{end}}</span>
           <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('ssh_key_file_input').click()">Browse…</button>
@@ -202,28 +190,26 @@
                onchange="uploadSSHKey(this)">
         <input type="hidden" id="ssh_public_key_path" name="ssh_public_key_path"
                value="{{.Config.SSHPublicKeyPath}}">
-        <small>Public key uploaded to AWS as an EC2 Key Pair and used by Terraform/Ansible to connect.</small>
       </div>
       <div class="form-group">
-        <label for="default_key_pair">Key Pair Name</label>
+        <label for="default_key_pair">Key Pair Name <span class="field-tip" data-tip="EC2 Key Pair name in AWS. Must match the uploaded SSH public key.">ⓘ</span></label>
         <input type="text" id="default_key_pair" name="default_key_pair"
                value="{{strDefault .Config.DefaultKeyPair "key"}}">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="default_vpc_name">VPC Name</label>
+        <label for="default_vpc_name">VPC Name <span class="field-tip" data-tip="Base name for the VPC. Full name will be prefix-vpc_name.">ⓘ</span></label>
         <input type="text" id="default_vpc_name" name="default_vpc_name"
                value="{{strDefault .Config.DefaultVpcName "mongo"}}" placeholder="mongo">
-        <small>Base name for the VPC (full name = prefix-vpc_name).</small>
       </div>
       <div class="form-group">
-        <label for="subnet_cidr">Subnet CIDR</label>
+        <label for="subnet_cidr">Subnet CIDR <span class="field-tip" data-tip="CIDR block for the VPC subnet (e.g. 10.128.0.0/20).">ⓘ</span></label>
         <input type="text" id="subnet_cidr" name="subnet_cidr"
                value="{{strDefault .Config.SubnetCIDR "10.128.0.0/20"}}">
       </div>
       <div class="form-group">
-        <label for="subnet_count">Subnet Count</label>
+        <label for="subnet_count">Subnet Count <span class="field-tip" data-tip="Number of subnets to create across availability zones (1–6).">ⓘ</span></label>
         <input type="number" id="subnet_count" name="subnet_count" min="1" max="6"
                value="{{intDefault .Config.SubnetCount 3}}">
       </div>
@@ -231,7 +217,7 @@
     <!-- Machine Image -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label for="machine_image">Machine Image (AMI)</label>
+        <label for="machine_image">Machine Image (AMI) <span class="field-tip" data-tip="AMI used for all instances. Select from available images or choose Custom… to enter an AMI ID directly.">ⓘ</span></label>
         <div style="display:flex;gap:0.5rem;align-items:center">
           <select id="machine_image" name="machine_image" style="flex:1"
                   onchange="toggleMachineImageCustom(this)">
@@ -245,7 +231,6 @@
                placeholder="ami-0abcdef1234567890"
                style="display:none;margin-top:0.3rem;width:100%"
                oninput="document.getElementById('machine_image').value='__custom__'">
-        <small>AMI used for all instances. Images are fetched from AWS for the selected region and grouped by OS. Select "Custom…" to enter an AMI ID directly.</small>
       </div>
     </div>
     <div class="form-row">
@@ -253,16 +238,13 @@
         <label><input type="checkbox" name="use_spot_instances"
                       {{if .Config.UseSpotInstances}}checked{{end}}>
           Use Spot Instances</label>
-        <small>Cheaper but instances may be terminated by the cloud provider.</small>
+        <small class="field-tip" data-tip="Spot instances are cheaper but may be reclaimed by AWS with short notice.">ⓘ</small>
       </div>
     </div>
     <!-- ssh_users: additional users whose public keys are provisioned on every instance -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label>Additional SSH Users</label>
-        <small style="margin-bottom:0.4rem">
-          Builds the <code>ssh_users</code> Terraform variable — adds public keys for each listed user to every AWS instance.
-        </small>
+        <label>Additional SSH Users <span class="field-tip" data-tip="Builds the ssh_users Terraform variable — adds public keys for each listed user to every AWS instance.">ⓘ</span></label>
         <div id="ssh-users-container">
           {{range $user, $key := .Config.SSHUsers}}
           <div class="ssh-user-row">
@@ -282,7 +264,7 @@
     <h2>Azure Settings</h2>
     <div class="form-row">
       <div class="form-group">
-        <label for="location">Location</label>
+        <label for="location">Location <span class="field-tip" data-tip="Azure region where all resources will be deployed.">ⓘ</span></label>
         <select id="location" name="location">
           <option value="">— loading regions… —</option>
           {{if .Config.Location}}<option value="{{.Config.Location}}" selected>{{.Config.Location}}</option>{{end}}
@@ -290,31 +272,27 @@
         <small><a href="#" onclick="reloadRegions(event)">↻ Refresh from Azure</a></small>
       </div>
       <div class="form-group">
-        <label for="my_ssh_user">Default SSH User</label>
+        <label for="my_ssh_user">Default SSH User <span class="field-tip" data-tip="Primary username Ansible uses to connect to Azure instances.">ⓘ</span></label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
                value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{strDefault .OSUser "azureuser"}}">
-        <small>Primary username Ansible uses to connect to instances.</small>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="subnet_cidr">Subnet CIDR</label>
+        <label for="subnet_cidr">Subnet CIDR <span class="field-tip" data-tip="CIDR block for the Azure VNet subnet (e.g. 10.0.0.0/16).">ⓘ</span></label>
         <input type="text" id="subnet_cidr" name="subnet_cidr"
                value="{{strDefault .Config.SubnetCIDR "10.0.0.0/16"}}">
       </div>
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" name="use_spot_instances"
                       {{if .Config.UseSpotInstances}}checked{{end}}>
-          Use Spot Instances</label>
+          Use Spot Instances <span class="field-tip" data-tip="Use Azure Spot VMs. Cheaper but can be evicted by Azure with short notice.">ⓘ</span></label>
       </div>
     </div>
     <!-- ssh_users: additional users whose public keys are provisioned on every instance -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label>Additional SSH Users</label>
-        <small style="margin-bottom:0.4rem">
-          Builds the <code>ssh_users</code> Terraform variable — adds public keys for each listed user to every Azure instance.
-        </small>
+        <label>Additional SSH Users <span class="field-tip" data-tip="Builds the ssh_users Terraform variable — adds public keys for each listed user to every Azure instance.">ⓘ</span></label>
         <div id="ssh-users-container">
           {{range $user, $key := .Config.SSHUsers}}
           <div class="ssh-user-row">
@@ -333,7 +311,7 @@
     <h2>CHAOS Settings</h2>
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label for="chaos_api_token">CHAOS API Token</label>
+        <label for="chaos_api_token">CHAOS API Token <span class="field-tip" data-tip="CHAOS API token required to create resources. Paste it directly or select a token file from disk.">ⓘ</span></label>
         <div style="display:flex;gap:0.5rem;align-items:center">
           <input type="password" id="chaos_api_token" name="chaos_api_token"
                  value="{{.Config.ChaosApiToken}}" autocomplete="new-password"
@@ -344,23 +322,20 @@
                    onchange="loadChaosTokenFromFile(this)">
           </label>
         </div>
-        <small>CHAOS API token required to create resources. Paste it directly or select a token file from disk.</small>
+
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="my_ssh_user">SSH User</label>
+        <label for="my_ssh_user">SSH User <span class="field-tip" data-tip="Username Ansible uses to connect to all CHAOS instances.">ⓘ</span></label>
         <input type="text" id="my_ssh_user" name="my_ssh_user"
                value="{{strDefault .Config.MySSHUser .OSUser}}" placeholder="{{strDefault .OSUser "ubuntu"}}">
-        <small>Username Ansible uses to connect to all CHAOS instances.</small>
       </div>
     </div>
     <!-- Firewall rules: multiple per-rule entries (CIDR + port) -->
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label>Firewall Access Rules</label>
-        <small>Define individual ingress rules. Each rule specifies the source CIDR and the destination port.
-          Leave empty for no external firewall restrictions.</small>
+        <label>Firewall Access Rules <span class="field-tip" data-tip="Define ingress rules: each specifies a source CIDR and destination port. Leave empty for no restrictions.">ⓘ</span></label>
         <div id="firewall-rules-container" style="margin-top:0.5rem">
           {{range .Config.FirewallRules}}
           <div class="firewall-rule-row" style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.4rem">
@@ -376,7 +351,7 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="os_image">OS Image</label>
+        <label for="os_image">OS Image <span class="field-tip" data-tip="Operating system for all CHAOS instances. Default: Ubuntu 24.04.">ⓘ</span></label>
         <select id="os_image" name="os_image">
           {{$curOs := strDefault .Config.OsImage "Ubuntu 24.04"}}
           <option value="Ubuntu 24.04" {{if eq $curOs "Ubuntu 24.04"}}selected{{end}}>Ubuntu 24.04</option>
@@ -388,13 +363,11 @@
           <option value="Oracle Linux 8" {{if eq $curOs "Oracle Linux 8"}}selected{{end}}>Oracle Linux 8</option>
           <option value="Debian 12" {{if eq $curOs "Debian 12"}}selected{{end}}>Debian 12</option>
         </select>
-        <small>Operating system for all CHAOS instances. Default: Ubuntu 24.04.</small>
       </div>
       <div class="form-group">
-        <label for="delete_after_days">Delete After (days)</label>
+        <label for="delete_after_days">Delete After (days) <span class="field-tip" data-tip="CHAOS will automatically delete instances after this many days (0–30, default 14).">ⓘ</span></label>
         <input type="number" id="delete_after_days" name="delete_after_days"
                value="{{intDefault .Config.DeleteAfterDays 14}}" min="0" max="30">
-        <small>CHAOS will automatically delete instances after this many days (0–30, default 14).</small>
       </div>
     </div>
   </section>
@@ -423,34 +396,75 @@
         <div class="customize-body" style="display:none">
           <div class="form-row">
             <div class="form-group">
-              <label>Env Tag</label>
+              <label>Env Tag <span class="field-tip" data-tip="Tag applied to resources in this cluster (e.g. test, prod).">ⓘ</span></label>
               <input type="text" name="cluster_env_tag[]" value="{{strDefault .Config.EnvTag "test"}}" placeholder="test">
             </div>
             <div class="form-group">
-              <label>Config Servers</label>
-              <input type="number" name="cluster_configsvr_count[]" value="{{intDefault .Config.ConfigsvrCount 3}}" min="1" max="7">
+              <label>Config Servers <span class="field-tip" data-tip="Number of config server replica set members (CSRS). Use an odd number, typically 3.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="cluster_configsvr_count[]" value="{{intDefault .Config.ConfigsvrCount 3}}" min="1" max="7">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Shards</label>
-              <input type="number" name="cluster_shard_count[]" value="{{intDefault .Config.ShardCount 2}}" min="1" max="10">
+              <label>Mongos Routers <span class="field-tip" data-tip="Number of mongos query router instances.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="cluster_mongos_count[]" value="{{intDefault .Config.MongosCount 2}}" min="1" max="10">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Shards <span class="field-tip" data-tip="Number of shards in this cluster.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="cluster_shard_count[]" value="{{intDefault .Config.ShardCount 2}}" min="1" max="10">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Replicas / Shard</label>
-              <input type="number" name="cluster_shardsvr_replicas[]" value="{{intDefault .Config.ShardsvrReplicas 2}}" min="1" max="7">
+              <label>Replicas / Shard <span class="field-tip" data-tip="Number of data-bearing replica set members per shard.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="cluster_shardsvr_replicas[]" value="{{intDefault .Config.ShardsvrReplicas 2}}" min="1" max="7">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Arbiters / Shard</label>
-              <input type="number" name="cluster_arbiters_per_replset[]" value="{{intDefault .Config.ArbitersPerReplset 1}}" min="0" max="3">
-            </div>
-            <div class="form-group">
-              <label>Mongos Routers</label>
-              <input type="number" name="cluster_mongos_count[]" value="{{intDefault .Config.MongosCount 2}}" min="1" max="10">
+              <label>Arbiters / Shard <span class="field-tip" data-tip="Number of arbiters per shard replica set. Use 0 for none.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="cluster_arbiters_per_replset[]" value="{{intPtrDefault .Config.ArbitersPerReplset 1}}" min="0" max="3">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
           </div>
           {{if eq $p "docker"}}
+            <div class="form-row">
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="cluster_enable_pmm[]" value="1"
+                            {{if .Config.EnablePmm}}checked{{end}}
+                            onchange="toggleImageGroup(this,'pmm')">
+                Enable PMM monitoring</label>
+            </div>
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="cluster_enable_pbm[]" value="1"
+                            {{if .Config.EnablePbm}}checked{{end}}
+                            onchange="toggleImageGroup(this,'pbm')">
+                Enable PBM backups</label>
+            </div>
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="cluster_bind_to_localhost[]" value="1"
+                            {{if .Config.BindToLocalhost}}checked{{end}}>
+                Bind ports to localhost only</label>
+            </div>
+          </div>
           <div class="form-row">
             <div class="form-group">
-              <label>PSMDB Image</label>
+              <label>PSMDB Image <span class="field-tip" data-tip="Percona Server for MongoDB Docker image tag used for all nodes in this cluster.">ⓘ</span></label>
               <select name="cluster_psmdb_image[]">
                 {{$cur := .Config.PsmdbImage}}
                 {{range $.PSMDBImages}}
@@ -460,8 +474,8 @@
                 {{end}}
               </select>
             </div>
-            <div class="form-group">
-              <label>PBM Image</label>
+            <div class="form-group" data-image-group="pbm" {{if not .Config.EnablePbm}}style="display:none"{{end}}>
+              <label>PBM Image <span class="field-tip" data-tip="Percona Backup for MongoDB Docker image tag used for backup agents in this cluster.">ⓘ</span></label>
               <select name="cluster_pbm_image[]">
                 {{$curPbm := .Config.PbmImage}}
                 {{range $.PBMImages}}
@@ -471,8 +485,8 @@
                 {{end}}
               </select>
             </div>
-            <div class="form-group">
-              <label>PMM Client Image</label>
+            <div class="form-group" data-image-group="pmm" {{if not .Config.EnablePmm}}style="display:none"{{end}}>
+              <label>PMM Client Image <span class="field-tip" data-tip="PMM Client Docker image tag used to monitor nodes in this cluster.">ⓘ</span></label>
               <select name="cluster_pmm_client_image[]">
                 {{$curPmmc := .Config.PmmClientImage}}
                 {{range $.PMMClientImages}}
@@ -481,23 +495,6 @@
                 </option>
                 {{end}}
               </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="cluster_enable_pmm[]" value="1"
-                            {{if .Config.EnablePmm}}checked{{end}}>
-                Enable PMM monitoring</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="cluster_enable_pbm[]" value="1"
-                            {{if .Config.EnablePbm}}checked{{end}}>
-                Enable PBM backups</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="cluster_bind_to_localhost[]" value="1"
-                            {{if .Config.BindToLocalhost}}checked{{end}}>
-                Bind ports to localhost only</label>
             </div>
           </div>
           {{else if eq $p "chaos"}}
@@ -511,7 +508,7 @@
             <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all clusters</strong> in this deployment.</p>
             <div class="form-row">
               <div class="form-group">
-                <label>Shard Svr vCPU</label>
+                <label>Shard Svr vCPU <span class="field-tip" data-tip="Number of virtual CPUs for shard server instances.">ⓘ</span></label>
                 <select name="shardsvr_cpu_cores">
                   {{$v := $.Config.ShardsvrCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -520,7 +517,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Shard Svr Memory (GB)</label>
+                <label>Shard Svr Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for shard server instances.">ⓘ</span></label>
                 <select name="shardsvr_memory_gb">
                   {{$v := $.Config.ShardsvrMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -529,7 +526,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Shard Svr Disk (GB)</label>
+                <label>Shard Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for shard server instances.">ⓘ</span></label>
                 <select name="shardsvr_volume_size">
                   {{$v := $.Config.ShardsvrVolumeSize}}
                   <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
@@ -542,7 +539,7 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Config Svr vCPU</label>
+                <label>Config Svr vCPU <span class="field-tip" data-tip="Number of virtual CPUs for config server instances.">ⓘ</span></label>
                 <select name="configsvr_cpu_cores">
                   {{$v := $.Config.ConfigsvrCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -551,7 +548,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Config Svr Memory (GB)</label>
+                <label>Config Svr Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for config server instances.">ⓘ</span></label>
                 <select name="configsvr_memory_gb">
                   {{$v := $.Config.ConfigsvrMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -560,7 +557,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Config Svr Disk (GB)</label>
+                <label>Config Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for config server instances.">ⓘ</span></label>
                 <select name="configsvr_volume_size">
                   {{$v := $.Config.ConfigsvrVolumeSize}}
                   <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
@@ -573,7 +570,7 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Mongos vCPU</label>
+                <label>Mongos vCPU <span class="field-tip" data-tip="Number of virtual CPUs for mongos router instances.">ⓘ</span></label>
                 <select name="mongos_cpu_cores">
                   {{$v := $.Config.MongosCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -582,7 +579,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Mongos Memory (GB)</label>
+                <label>Mongos Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for mongos router instances.">ⓘ</span></label>
                 <select name="mongos_memory_gb">
                   {{$v := $.Config.MongosMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -591,7 +588,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Arbiter vCPU</label>
+                <label>Arbiter vCPU <span class="field-tip" data-tip="Number of virtual CPUs for arbiter instances.">ⓘ</span></label>
                 <select name="arbiter_cpu_cores">
                   {{$v := $.Config.ArbiterCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -600,7 +597,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Arbiter Memory (GB)</label>
+                <label>Arbiter Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for arbiter instances.">ⓘ</span></label>
                 <select name="arbiter_memory_gb">
                   {{$v := $.Config.ArbiterMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -621,13 +618,13 @@
             <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all clusters</strong> in this deployment. Leave blank to use Terraform defaults.</p>
             <div class="form-row">
               <div class="form-group">
-                <label>Shard Svr Instance Type</label>
+                <label>Shard Svr Instance Type <span class="field-tip" data-tip="Cloud instance type for shard server nodes (e.g. t3.medium for AWS).">ⓘ</span></label>
                 <input type="text" name="shardsvr_type"
                        value="{{$.Config.ShardsvrType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
               </div>
               <div class="form-group">
-                <label>Shard Svr Disk (GB)</label>
+                <label>Shard Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for shard server instances.">ⓘ</span></label>
                 <input type="number" name="shardsvr_volume_size"
                        value="{{if $.Config.ShardsvrVolumeSize}}{{$.Config.ShardsvrVolumeSize}}{{end}}"
                        placeholder="50" min="10">
@@ -635,13 +632,13 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Config Svr Instance Type</label>
+                <label>Config Svr Instance Type <span class="field-tip" data-tip="Cloud instance type for config server nodes.">ⓘ</span></label>
                 <input type="text" name="configsvr_type"
                        value="{{$.Config.ConfigsvrType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
               </div>
               <div class="form-group">
-                <label>Config Svr Disk (GB)</label>
+                <label>Config Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for config server instances.">ⓘ</span></label>
                 <input type="number" name="configsvr_volume_size"
                        value="{{if $.Config.ConfigsvrVolumeSize}}{{$.Config.ConfigsvrVolumeSize}}{{end}}"
                        placeholder="20" min="10">
@@ -649,13 +646,13 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Mongos Instance Type</label>
+                <label>Mongos Instance Type <span class="field-tip" data-tip="Cloud instance type for mongos router nodes.">ⓘ</span></label>
                 <input type="text" name="mongos_type"
                        value="{{$.Config.MongosType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
               </div>
               <div class="form-group">
-                <label>Arbiter Instance Type</label>
+                <label>Arbiter Instance Type <span class="field-tip" data-tip="Cloud instance type for arbiter nodes.">ⓘ</span></label>
                 <input type="text" name="arbiter_type"
                        value="{{$.Config.ArbiterType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
@@ -663,7 +660,7 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Data Disk Type</label>
+                <label>Data Disk Type <span class="field-tip" data-tip="Disk type for data volumes (e.g. gp2 for AWS, pd-standard for GCP).">ⓘ</span></label>
                 <input type="text" name="data_disk_type"
                        value="{{$.Config.DataDiskType}}"
                        placeholder="{{if eq $p "aws"}}gp2{{else if eq $p "gcp"}}pd-standard{{else}}Standard_LRS{{end}}">
@@ -681,7 +678,7 @@
   <!-- ──────────── Replica Sets ──────────── -->
   <section class="form-section">
     <div class="section-header">
-      <h2>Standalone Replica Sets</h2>
+      <h2>Standalone Replica Sets <span class="field-tip" data-tip="Optional: standalone replica sets separate from the sharded clusters above.">ⓘ</span></h2>
       <button type="button" class="btn btn-outline btn-sm" onclick="addReplset()">+ Add Replica Set</button>
     </div>
     <div id="replsets-container">
@@ -701,32 +698,58 @@
         <div class="customize-body" style="display:none">
           <div class="form-row">
             <div class="form-group">
-              <label>Env Tag</label>
+              <label>Env Tag <span class="field-tip" data-tip="Tag applied to resources in this cluster (e.g. test, prod).">ⓘ</span></label>
               <input type="text" name="replset_env_tag[]" value="{{strDefault .Config.EnvTag "test"}}">
             </div>
             <div class="form-group">
-              <label>Data Nodes</label>
-              <input type="number" name="replset_data_nodes[]" value="{{intDefault .Config.DataNodesPerReplset 2}}" min="1" max="7">
+              <label>Data Nodes <span class="field-tip" data-tip="Number of data-bearing replica set members.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="replset_data_nodes[]" value="{{intDefault .Config.DataNodesPerReplset 2}}" min="1" max="7">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
             <div class="form-group">
-              <label>Arbiters</label>
-              <input type="number" name="replset_arbiters[]" value="{{intDefault .Config.ArbitersPerReplset 1}}" min="0" max="3">
+              <label>Arbiters <span class="field-tip" data-tip="Number of arbiters in this replica set. Use 0 for none.">ⓘ</span></label>
+              <div class="number-stepper">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button>
+                <input type="number" name="replset_arbiters[]" value="{{intPtrDefault .Config.ArbitersPerReplset 1}}" min="0" max="3">
+                <button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button>
+              </div>
             </div>
             {{if eq $p "docker"}}
             <div class="form-group">
-              <label>Base Port</label>
+              <label>Base Port <span class="field-tip" data-tip="Starting port number for data nodes. Auto-assigned to avoid collisions between replica sets.">ⓘ</span></label>
               <input type="number" name="replset_port[]"
                      value="{{intDefault .Config.ReplsetPort 27017}}"
                      placeholder="27017" min="1024" max="65000"
                      title="Starting port for data nodes. Auto-assigned to avoid collisions.">
-              <small>Auto-assigned; change only if needed.</small>
             </div>
             {{end}}
           </div>
           {{if eq $p "docker"}}
           <div class="form-row">
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="replset_enable_pmm[]" value="1"
+                            {{if .Config.EnablePmm}}checked{{end}}
+                            onchange="toggleImageGroup(this,'pmm')">
+                Enable PMM monitoring</label>
+            </div>
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="replset_enable_pbm[]" value="1"
+                            {{if .Config.EnablePbm}}checked{{end}}
+                            onchange="toggleImageGroup(this,'pbm')">
+                Enable PBM backups</label>
+            </div>
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="replset_bind_to_localhost[]" value="1"
+                            {{if .Config.BindToLocalhost}}checked{{end}}>
+                Bind ports to localhost only</label>
+            </div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
-              <label>PSMDB Image</label>
+              <label>PSMDB Image <span class="field-tip" data-tip="Percona Server for MongoDB Docker image tag for this replica set.">ⓘ</span></label>
               <select name="replset_psmdb_image[]">
                 {{$cur := .Config.PsmdbImage}}
                 {{range $.PSMDBImages}}
@@ -736,8 +759,8 @@
                 {{end}}
               </select>
             </div>
-            <div class="form-group">
-              <label>PBM Image</label>
+            <div class="form-group" data-image-group="pbm" {{if not .Config.EnablePbm}}style="display:none"{{end}}>
+              <label>PBM Image <span class="field-tip" data-tip="Percona Backup for MongoDB Docker image tag for backup agents in this replica set.">ⓘ</span></label>
               <select name="replset_pbm_image[]">
                 {{$curPbm := .Config.PbmImage}}
                 {{range $.PBMImages}}
@@ -747,8 +770,8 @@
                 {{end}}
               </select>
             </div>
-            <div class="form-group">
-              <label>PMM Client Image</label>
+            <div class="form-group" data-image-group="pmm" {{if not .Config.EnablePmm}}style="display:none"{{end}}>
+              <label>PMM Client Image <span class="field-tip" data-tip="PMM Client Docker image tag for monitoring nodes in this replica set.">ⓘ</span></label>
               <select name="replset_pmm_client_image[]">
                 {{$curPmmc := .Config.PmmClientImage}}
                 {{range $.PMMClientImages}}
@@ -757,23 +780,6 @@
                 </option>
                 {{end}}
               </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="replset_enable_pmm[]" value="1"
-                            {{if .Config.EnablePmm}}checked{{end}}>
-                Enable PMM monitoring</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="replset_enable_pbm[]" value="1"
-                            {{if .Config.EnablePbm}}checked{{end}}>
-                Enable PBM backups</label>
-            </div>
-            <div class="form-group form-group-checkbox">
-              <label><input type="checkbox" name="replset_bind_to_localhost[]" value="1"
-                            {{if .Config.BindToLocalhost}}checked{{end}}>
-                Bind ports to localhost only</label>
             </div>
           </div>
           {{else if eq $p "chaos"}}
@@ -787,7 +793,7 @@
             <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all replica sets</strong> in this deployment.</p>
             <div class="form-row">
               <div class="form-group">
-                <label>Data Node vCPU</label>
+                <label>Data Node vCPU <span class="field-tip" data-tip="Number of virtual CPUs for data node instances.">ⓘ</span></label>
                 <select name="replsetsvr_cpu_cores">
                   {{$v := $.Config.ReplsetSvrCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -796,7 +802,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Data Node Memory (GB)</label>
+                <label>Data Node Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for data node instances.">ⓘ</span></label>
                 <select name="replsetsvr_memory_gb">
                   {{$v := $.Config.ReplsetSvrMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -805,7 +811,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Data Node Disk (GB)</label>
+                <label>Data Node Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for data node instances.">ⓘ</span></label>
                 <select name="replsetsvr_volume_size">
                   {{$v := $.Config.ReplsetSvrVolumeSize}}
                   <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
@@ -818,7 +824,7 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Arbiter vCPU</label>
+                <label>Arbiter vCPU <span class="field-tip" data-tip="Number of virtual CPUs for arbiter instances.">ⓘ</span></label>
                 <select name="arbiter_cpu_cores">
                   {{$v := $.Config.ArbiterCpuCores}}
                   <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -827,7 +833,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Arbiter Memory (GB)</label>
+                <label>Arbiter Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for arbiter instances.">ⓘ</span></label>
                 <select name="arbiter_memory_gb">
                   {{$v := $.Config.ArbiterMemoryGb}}
                   <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -848,13 +854,13 @@
             <p class="hint" style="margin-bottom:0.75rem">These compute settings are shared across <strong>all replica sets</strong> in this deployment. Leave blank to use Terraform defaults.</p>
             <div class="form-row">
               <div class="form-group">
-                <label>Data Node Instance Type</label>
+                <label>Data Node Instance Type <span class="field-tip" data-tip="Cloud instance type for replica set data nodes.">ⓘ</span></label>
                 <input type="text" name="replsetsvr_type"
                        value="{{$.Config.ReplsetSvrType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
               </div>
               <div class="form-group">
-                <label>Data Node Disk (GB)</label>
+                <label>Data Node Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for data node instances.">ⓘ</span></label>
                 <input type="number" name="replsetsvr_volume_size"
                        value="{{if $.Config.ReplsetSvrVolumeSize}}{{$.Config.ReplsetSvrVolumeSize}}{{end}}"
                        placeholder="100" min="10">
@@ -862,13 +868,13 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Arbiter Instance Type</label>
+                <label>Arbiter Instance Type <span class="field-tip" data-tip="Cloud instance type for arbiter nodes.">ⓘ</span></label>
                 <input type="text" name="arbiter_type"
                        value="{{$.Config.ArbiterType}}"
                        placeholder="{{if eq $p "aws"}}t3.medium{{else if eq $p "gcp"}}e2-medium{{else}}Standard_B2s{{end}}">
               </div>
               <div class="form-group">
-                <label>Data Disk Type</label>
+                <label>Data Disk Type <span class="field-tip" data-tip="Disk type for data volumes (e.g. gp2 for AWS, pd-standard for GCP).">ⓘ</span></label>
                 <input type="text" name="data_disk_type"
                        value="{{$.Config.DataDiskType}}"
                        placeholder="{{if eq $p "aws"}}gp2{{else if eq $p "gcp"}}pd-standard{{else}}Standard_LRS{{end}}">
@@ -881,7 +887,6 @@
       </div>
       {{end}}
     </div>
-    <p class="hint">Optional: standalone replica sets separate from the sharded clusters above.</p>
   </section>
 
   <!-- ──────────── PMM Server ──────────── -->
@@ -911,7 +916,7 @@
         <div class="customize-body" style="display:none">
           <div class="form-row">
             <div class="form-group">
-              <label>PMM Server Image</label>
+              <label>PMM Server Image <span class="field-tip" data-tip="Percona PMM Server Docker image tag.">ⓘ</span></label>
               <select name="pmm_server_image[]">
                 {{$cur := .Config.PmmServerImage}}
                 {{range $.PMMImages}}
@@ -922,19 +927,11 @@
               </select>
             </div>
             <div class="form-group">
-              <label>PMM Port</label>
+              <label>PMM Port <span class="field-tip" data-tip="Host port exposed for the PMM Server HTTPS interface (default: 8443).">ⓘ</span></label>
               <input type="number" name="pmm_server_port[]" value="{{intDefault .Config.PmmPort 8443}}" placeholder="8443">
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label>Admin User</label>
-              <input type="text" name="pmm_server_user[]" value="{{strDefault .Config.PmmServerUser "admin"}}">
-            </div>
-            <div class="form-group">
-              <label>Admin Password</label>
-              <input type="password" name="pmm_server_pwd[]" value="{{strDefault .Config.PmmServerPwd "admin"}}" placeholder="admin">
-            </div>
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="pmm_server_bind_localhost[]" value="1"
                             {{if .Config.BindToLocalhost}}checked{{end}}>
@@ -952,24 +949,23 @@
       <button type="button" class="btn btn-outline btn-sm"
               id="pmm-toggle"
               onclick="togglePmmSettings()"
-              {{if not (boolDefault .Config.EnablePmm true)}}style="display:none"{{end}}
+              {{if not (boolDefault .Config.EnablePmm false)}}style="display:none"{{end}}
               >{{if $pmmCustomized}}▲ Collapse{{else}}▼ Customize{{end}}</button>
     </div>
     <!-- Deploy PMM checkbox always visible, outside the collapsible body -->
     <div class="form-row" style="margin-bottom:0.5rem">
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" id="enable_pmm" name="enable_pmm"
-                      {{if boolDefault .Config.EnablePmm true}}checked{{end}}>
-          Deploy PMM monitoring server</label>
-        <small>Uncheck to skip the PMM server for this environment.</small>
+                      {{if boolDefault .Config.EnablePmm false}}checked{{end}}>
+          Deploy PMM monitoring server <span class="field-tip" data-tip="Deploy a dedicated PMM monitoring server alongside MongoDB nodes.">ⓘ</span></label>
       </div>
     </div>
     <div id="pmm-cloud-body" {{if not $pmmCustomized}}style="display:none"{{end}}>
-    <div id="pmm-cloud-settings" {{if not (boolDefault .Config.EnablePmm true)}}style="display:none"{{end}}>
+    <div id="pmm-cloud-settings" {{if not (boolDefault .Config.EnablePmm false)}}style="display:none"{{end}}>
     {{if eq $p "chaos"}}
     <div class="form-row">
       <div class="form-group">
-        <label for="pmm_cpu_cores">PMM vCPU</label>
+        <label for="pmm_cpu_cores">PMM vCPU <span class="field-tip" data-tip="Number of virtual CPUs for the PMM server VM.">ⓘ</span></label>
         <select id="pmm_cpu_cores" name="pmm_cpu_cores">
           {{$v := .Config.PmmCpuCores}}
           <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -978,7 +974,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="pmm_memory_gb">PMM Memory (GB)</label>
+        <label for="pmm_memory_gb">PMM Memory (GB) <span class="field-tip" data-tip="Memory size for the PMM server VM.">ⓘ</span></label>
         <select id="pmm_memory_gb" name="pmm_memory_gb">
           {{$v := .Config.PmmMemoryGb}}
           <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -987,7 +983,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="pmm_volume_size">Disk (GB)</label>
+        <label for="pmm_volume_size">Disk (GB) <span class="field-tip" data-tip="Disk size for the PMM server VM.">ⓘ</span></label>
         <select id="pmm_volume_size" name="pmm_volume_size">
           {{$v := .Config.PmmVolumeSize}}
           <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
@@ -998,41 +994,39 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="pmm_port">PMM Port</label>
+        <label for="pmm_port">PMM Port <span class="field-tip" data-tip="HTTPS port for the PMM UI. Use 8443 for PMM 3, 443 for PMM 2.">ⓘ</span></label>
         <input type="number" id="pmm_port" name="pmm_port"
                value="{{intDefault .Config.PmmPort 8443}}">
-        <small>8443 for PMM 3, 443 for PMM 2</small>
       </div>
     </div>
     {{else}}
     <div class="form-row">
       <div class="form-group">
-        <label for="pmm_type">Instance Type</label>
+        <label for="pmm_type">Instance Type <span class="field-tip" data-tip="Cloud instance type for the PMM server VM (e.g. t3.large for AWS).">ⓘ</span></label>
         <input type="text" id="pmm_type" name="pmm_type"
                value="{{.Config.PmmType}}"
                placeholder="{{if eq $p "aws"}}t3.large{{else if eq $p "gcp"}}e2-standard-2{{else}}Standard_D2s_v3{{end}}">
       </div>
       <div class="form-group">
-        <label for="pmm_volume_size">Volume Size (GB)</label>
+        <label for="pmm_volume_size">Volume Size (GB) <span class="field-tip" data-tip="Root volume size for the PMM server VM (minimum 20 GB).">ⓘ</span></label>
         <input type="number" id="pmm_volume_size" name="pmm_volume_size"
                value="{{intDefault .Config.PmmVolumeSize 100}}" min="20">
       </div>
       <div class="form-group">
-        <label for="pmm_port">PMM Port</label>
+        <label for="pmm_port">PMM Port <span class="field-tip" data-tip="HTTPS port for the PMM UI. Use 8443 for PMM 3, 443 for PMM 2.">ⓘ</span></label>
         <input type="number" id="pmm_port" name="pmm_port"
                value="{{intDefault .Config.PmmPort 8443}}">
-        <small>8443 for PMM 3, 443 for PMM 2</small>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label for="pmm_disk_type">PMM Disk Type</label>
+        <label for="pmm_disk_type">PMM Disk Type <span class="field-tip" data-tip="Storage type for the PMM VM disk (e.g. gp2 for AWS, pd-ssd for GCP).">ⓘ</span></label>
         <input type="text" id="pmm_disk_type" name="pmm_disk_type"
                value="{{.Config.PmmDiskType}}"
                placeholder="{{if eq $p "aws"}}gp2{{else if eq $p "gcp"}}pd-ssd{{else}}Premium_LRS{{end}}">
       </div>
       <div class="form-group">
-        <label>PMM Server Image (Ansible)</label>
+        <label>PMM Server Image (Ansible) <span class="field-tip" data-tip="Docker image used by Ansible to provision the PMM server.">ⓘ</span></label>
         <select name="pmm_image">
           {{$curPmm := .Config.PmmImage}}
           {{range .PMMImages}}
@@ -1059,52 +1053,51 @@
       <button type="button" class="btn btn-outline btn-sm"
               id="minio-details-toggle"
               onclick="toggleMinioDetails(this)"
-              {{if not (boolDefault .Config.EnableMinio true)}}style="display:none"{{end}}
+              {{if not (boolDefault .Config.EnableMinio false)}}style="display:none"{{end}}
               >{{if $minioDetailsConfigured}}▲ Collapse{{else}}▼ Customize{{end}}</button>
     </div>
     <!-- Enable Minio checkbox always visible, outside the collapsible body -->
     <div class="form-row" style="margin-bottom:0.5rem">
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" id="enable_minio" name="enable_minio" value="true"
-                      {{if boolDefault .Config.EnableMinio true}}checked{{end}}>
-          Deploy Minio backup storage VM</label>
-        <small>Uncheck to skip the Minio VM for this environment.</small>
+                      {{if boolDefault .Config.EnableMinio false}}checked{{end}}>
+          Deploy Minio backup storage VM <span class="field-tip" data-tip="Deploy a dedicated Minio S3-compatible storage VM for backups.">ⓘ</span></label>
       </div>
     </div>
     <p class="hint">Optional: deploy a dedicated VM running <a href="https://min.io" target="_blank">Minio</a> for S3-compatible backup storage, provisioned via Ansible.</p>
-    <div id="minio-vm-body" {{if not (boolDefault .Config.EnableMinio true)}}style="display:none"{{end}}>
+    <div id="minio-vm-body" {{if not (boolDefault .Config.EnableMinio false)}}style="display:none"{{end}}>
       <div id="minio-details-body" {{if not $minioDetailsConfigured}}style="display:none"{{end}}>
         <span class="subsection-title">VM Details</span>
         <div class="form-row">
           <div class="form-group">
-            <label for="minio_root_user">Minio Root User</label>
+            <label for="minio_root_user">Minio Root User <span class="field-tip" data-tip="Admin username for the Minio server (passed to Ansible).">ⓘ</span></label>
             <input type="text" id="minio_root_user" name="minio_root_user"
                    value="{{strDefault .Config.MinioRootUser "minioadmin"}}">
           </div>
           <div class="form-group">
-            <label for="minio_root_password">Minio Root Password</label>
+            <label for="minio_root_password">Minio Root Password <span class="field-tip" data-tip="Admin password for the Minio server (passed to Ansible).">ⓘ</span></label>
             <input type="password" id="minio_root_password" name="minio_root_password"
                    value="{{strDefault .Config.MinioRootPassword "minioadmin"}}" autocomplete="new-password">
           </div>
           <div class="form-group">
-            <label for="default_bucket_name">Bucket Name</label>
+            <label for="default_bucket_name">Bucket Name <span class="field-tip" data-tip="Default S3 bucket name created in Minio for MongoDB backups.">ⓘ</span></label>
             <input type="text" id="default_bucket_name" name="default_bucket_name"
                    value="{{strDefault .Config.DefaultBucketName "mongo-backups"}}">
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label for="minio_port">API Port</label>
+            <label for="minio_port">API Port <span class="field-tip" data-tip="HTTP port for the Minio S3 API (default: 9000).">ⓘ</span></label>
             <input type="number" id="minio_port" name="minio_port"
                    value="{{intDefault .Config.MinioPort 9000}}">
           </div>
           <div class="form-group">
-            <label for="minio_console_port">Console Port</label>
+            <label for="minio_console_port">Console Port <span class="field-tip" data-tip="HTTP port for the Minio web console (default: 9001).">ⓘ</span></label>
             <input type="number" id="minio_console_port" name="minio_console_port"
                    value="{{intDefault .Config.MinioConsolePort 9001}}">
           </div>
           <div class="form-group">
-            <label for="backup_retention">Retention (days)</label>
+            <label for="backup_retention">Retention (days) <span class="field-tip" data-tip="Number of days to retain PBM backups (minimum 1).">ⓘ</span></label>
             <input type="number" id="backup_retention" name="backup_retention"
                    value="{{intDefault .Config.BackupRetention 2}}" min="1">
           </div>
@@ -1119,7 +1112,7 @@
         <div class="compute-block-body" {{if not $minioComputeConfigured}}style="display:none"{{end}}>
           <div class="form-row">
             <div class="form-group">
-              <label for="minio_cpu_cores">Minio VM vCPU</label>
+              <label for="minio_cpu_cores">Minio VM vCPU <span class="field-tip" data-tip="Number of virtual CPUs for the Minio VM.">ⓘ</span></label>
               <select id="minio_cpu_cores" name="minio_cpu_cores">
                 {{$v := .Config.MinioCpuCores}}
                 <option value="2" {{if or (eq $v 0) (eq $v 2)}}selected{{end}}>2 vCPU</option>
@@ -1128,7 +1121,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="minio_memory_gb">Minio VM Memory (GB)</label>
+              <label for="minio_memory_gb">Minio VM Memory (GB) <span class="field-tip" data-tip="Memory size for the Minio VM.">ⓘ</span></label>
               <select id="minio_memory_gb" name="minio_memory_gb">
                 {{$v := .Config.MinioMemoryGb}}
                 <option value="4" {{if or (eq $v 0) (eq $v 4)}}selected{{end}}>4 GB</option>
@@ -1137,7 +1130,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label for="minio_volume_size">Minio VM Disk (GB)</label>
+              <label for="minio_volume_size">Minio VM Disk (GB) <span class="field-tip" data-tip="Disk size for the Minio VM.">ⓘ</span></label>
               <select id="minio_volume_size" name="minio_volume_size">
                 {{$v := .Config.MinioVolumeSize}}
                 <option value="20" {{if or (eq $v 0) (eq $v 20)}}selected{{end}}>20 GB</option>
@@ -1162,7 +1155,7 @@
       <label class="toggle-label">
         <input type="checkbox" id="enable-minio-docker"
                {{if .SortedMinio}}checked{{end}}
-               onchange="toggleDockerSingleServer('minio-servers-container', this, addMinioServer)">
+               onchange="toggleDockerSingleServer('minio-servers-container', this, addMinioServer); toggleCredentialRow('cred-minio-row', this.checked)">
         Include Minio Server
       </label>
     </div>
@@ -1181,34 +1174,26 @@
         <div class="customize-body" style="display:none">
           <div class="form-row">
             <div class="form-group">
-              <label>Minio Image</label>
+              <label>Minio Image <span class="field-tip" data-tip="Minio Docker image to use (e.g. minio/minio).">ⓘ</span></label>
               <input type="text" name="minio_image[]" value="{{strDefault .Config.MinioImage "minio/minio"}}" placeholder="minio/minio">
             </div>
             <div class="form-group">
-              <label>API Port</label>
+              <label>API Port <span class="field-tip" data-tip="Host port for the Minio S3 API (default: 9000).">ⓘ</span></label>
               <input type="number" name="minio_port[]" value="{{intDefault .Config.MinioPort 9000}}">
             </div>
             <div class="form-group">
-              <label>Console Port</label>
+              <label>Console Port <span class="field-tip" data-tip="Host port for the Minio web console (default: 9001).">ⓘ</span></label>
               <input type="number" name="minio_console_port[]" value="{{intDefault .Config.MinioConsolePort 9001}}">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Bucket Name</label>
+              <label>Bucket Name <span class="field-tip" data-tip="Default S3 bucket name created in Minio for MongoDB backups.">ⓘ</span></label>
               <input type="text" name="minio_bucket_name[]" value="{{strDefault .Config.BucketName "mongo-backups"}}">
             </div>
             <div class="form-group">
-              <label>Retention (days)</label>
+              <label>Retention (days) <span class="field-tip" data-tip="Number of days to keep backups before expiry (minimum 1).">ⓘ</span></label>
               <input type="number" name="minio_backup_retention[]" value="{{intDefault .Config.BackupRetention 2}}" min="1">
-            </div>
-            <div class="form-group">
-              <label>Access Key</label>
-              <input type="text" name="minio_access_key[]" value="{{strDefault .Config.MinioAccessKey "minio"}}">
-            </div>
-            <div class="form-group">
-              <label>Secret Key</label>
-              <input type="password" name="minio_secret_key[]" value="{{strDefault .Config.MinioSecretKey "minioadmin"}}">
             </div>
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="minio_bind_localhost[]" value="1"
@@ -1229,7 +1214,7 @@
       <label class="toggle-label">
         <input type="checkbox" id="enable-ldap-docker"
                {{if .SortedLdap}}checked{{end}}
-               onchange="toggleDockerSingleServer('ldap-servers-container', this, addLdapServer)">
+               onchange="toggleDockerSingleServer('ldap-servers-container', this, addLdapServer); toggleCredentialRow('cred-ldap-row', this.checked)">
         Include LDAP Server
       </label>
     </div>
@@ -1248,22 +1233,18 @@
         <div class="customize-body" style="display:none">
           <div class="form-row">
             <div class="form-group">
-              <label>LDAP Image</label>
+              <label>LDAP Image <span class="field-tip" data-tip="OpenLDAP Docker image to use (e.g. osixia/openldap:1.5.0).">ⓘ</span></label>
               <input type="text" name="ldap_image[]" value="{{strDefault .Config.LdapImage "osixia/openldap:1.5.0"}}" placeholder="osixia/openldap:1.5.0">
             </div>
             <div class="form-group">
-              <label>Port</label>
+              <label>Port <span class="field-tip" data-tip="Host port for the LDAP service (default: 389).">ⓘ</span></label>
               <input type="number" name="ldap_port[]" value="{{intDefault .Config.LdapPort 389}}">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Domain</label>
+              <label>Domain <span class="field-tip" data-tip="LDAP base domain (e.g. example.org).">ⓘ</span></label>
               <input type="text" name="ldap_domain[]" value="{{strDefault .Config.LdapDomain "example.org"}}">
-            </div>
-            <div class="form-group">
-              <label>Admin Password</label>
-              <input type="password" name="ldap_admin_password[]" value="{{strDefault .Config.LdapAdminPassword "admin"}}">
             </div>
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="ldap_bind_localhost[]" value="1"
@@ -1284,12 +1265,12 @@
     <h2>Backup (PBM)</h2>
     <div class="form-row">
       <div class="form-group">
-        <label for="default_bucket_name">Bucket / Container Name</label>
+        <label for="default_bucket_name">Bucket / Container Name <span class="field-tip" data-tip="S3 bucket (AWS/CHAOS) or Azure Blob container name used by PBM for backup storage.">ⓘ</span></label>
         <input type="text" id="default_bucket_name" name="default_bucket_name"
                value="{{strDefault .Config.DefaultBucketName "mongo-bkp-storage"}}">
       </div>
       <div class="form-group">
-        <label for="backup_retention">Retention (days)</label>
+        <label for="backup_retention">Retention (days) <span class="field-tip" data-tip="Number of days to retain PBM backups (minimum 1).">ⓘ</span></label>
         <input type="number" id="backup_retention" name="backup_retention"
                value="{{intDefault .Config.BackupRetention 2}}" min="1">
       </div>
@@ -1299,48 +1280,65 @@
 
   <!-- ──────────── Credentials ──────────── -->
   <section class="form-section">
-    {{$credConfigured := or (index .Config.AnsibleVars "mongo_admin_user") (index .Config.AnsibleVars "mongo_admin_password") (index .Config.AnsibleVars "pmm_server_user") (index .Config.AnsibleVars "pmm_server_pwd") (index .Config.AnsibleVars "pbm_agent_user") (index .Config.AnsibleVars "pbmpwd")}}
+    {{$credConfigured := or (index .Config.AnsibleVars "mongo_admin_user") (index .Config.AnsibleVars "mongo_admin_password") (index .Config.AnsibleVars "pbm_agent_user") (index .Config.AnsibleVars "pbmpwd") .SortedPmmServers .SortedMinio .SortedLdap}}
     <div class="section-header">
-      <h2>Credentials</h2>
+      <h2>Credentials <span class="field-tip" data-tip="Usernames and passwords passed to Ansible and Terraform. Values here populate group_vars or --extra-vars.">ⓘ</span></h2>
       <button type="button" class="btn btn-outline btn-sm" id="credentials-toggle"
-              onclick="toggleCredentials(this)">{{if $credConfigured}}▲ Collapse{{else}}▼ Customize{{end}}</button>
+              onclick="toggleCredentials(this)">▼ Customize</button>
     </div>
-    <p class="hint">Usernames and passwords passed to Ansible and Terraform. Values here populate <code>group_vars</code> or <code>--extra-vars</code>.</p>
-    <div id="credentials-body" {{if not $credConfigured}}style="display:none"{{end}}>
-      <div class="credentials-grid">
-        <div class="form-group">
-          <label for="cred_mongo_admin_user">MongoDB Root User</label>
-          <input type="text" id="cred_mongo_admin_user" name="cred_mongo_admin_user"
-                 value="{{index .Config.AnsibleVars "mongo_admin_user"}}" placeholder="admin">
+    <div id="credentials-body" style="display:none">
+      <div class="credentials-list">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cred_mongo_admin_user">MongoDB Root User <span class="field-tip" data-tip="MongoDB admin username passed to Ansible as mongo_admin_user.">ⓘ</span></label>
+            <input type="text" id="cred_mongo_admin_user" name="cred_mongo_admin_user"
+                   value="{{index .Config.AnsibleVars "mongo_admin_user"}}" placeholder="root">
+          </div>
+          <div class="form-group">
+            <label for="cred_mongo_admin_password">MongoDB Root Password <span class="field-tip" data-tip="MongoDB admin password passed to Ansible as mongo_admin_password. Leave blank to use the default.">ⓘ</span></label>
+            <input type="password" id="cred_mongo_admin_password" name="cred_mongo_admin_password"
+                   value="{{index .Config.AnsibleVars "mongo_admin_password"}}" placeholder="percona"
+                   autocomplete="new-password">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cred_mongo_admin_password">MongoDB Root Password</label>
-          <input type="password" id="cred_mongo_admin_password" name="cred_mongo_admin_password"
-                 value="{{index .Config.AnsibleVars "mongo_admin_password"}}" placeholder="admin"
-                 autocomplete="new-password">
+        {{if eq $p "docker"}}
+        <div class="form-row" id="cred-minio-row" {{if not .SortedMinio}}style="display:none"{{end}}>
+          <div class="form-group">
+            <label for="cred_minio_access_key">Minio Access Key <span class="field-tip" data-tip="Access key used to authenticate with the Minio server.">ⓘ</span></label>
+            <input type="text" id="cred_minio_access_key" name="cred_minio_access_key"
+                   value="{{if .SortedMinio}}{{(index .SortedMinio 0).Config.MinioAccessKey}}{{end}}"
+                   placeholder="minio">
+          </div>
+          <div class="form-group">
+            <label for="cred_minio_secret_key">Minio Secret Key <span class="field-tip" data-tip="Secret key used to authenticate with the Minio server.">ⓘ</span></label>
+            <input type="password" id="cred_minio_secret_key" name="cred_minio_secret_key"
+                   value="{{if .SortedMinio}}{{(index .SortedMinio 0).Config.MinioSecretKey}}{{end}}"
+                   placeholder="minioadmin" autocomplete="new-password">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cred_pmm_server_user">PMM User</label>
-          <input type="text" id="cred_pmm_server_user" name="cred_pmm_server_user"
-                 value="{{index .Config.AnsibleVars "pmm_server_user"}}" placeholder="admin">
+        <div class="form-row" id="cred-ldap-row" {{if not .SortedLdap}}style="display:none"{{end}}>
+          <div class="form-group">
+            <label for="cred_ldap_admin_password">LDAP Admin Password <span class="field-tip" data-tip="Password for the LDAP admin account.">ⓘ</span></label>
+            <input type="password" id="cred_ldap_admin_password" name="cred_ldap_admin_password"
+                   value="{{if .SortedLdap}}{{(index .SortedLdap 0).Config.LdapAdminPassword}}{{end}}"
+                   placeholder="admin" autocomplete="new-password">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cred_pmm_server_pwd">PMM Password</label>
-          <input type="password" id="cred_pmm_server_pwd" name="cred_pmm_server_pwd"
-                 value="{{index .Config.AnsibleVars "pmm_server_pwd"}}" placeholder="admin"
-                 autocomplete="new-password">
+        {{else}}
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cred_pbm_agent_user">PBM Agent User <span class="field-tip" data-tip="Username for the PBM backup agent (passed as pbm_agent_user).">ⓘ</span></label>
+            <input type="text" id="cred_pbm_agent_user" name="cred_pbm_agent_user"
+                   value="{{index .Config.AnsibleVars "pbm_agent_user"}}" placeholder="pbm">
+          </div>
+          <div class="form-group">
+            <label for="cred_pbmpwd">PBM Agent Password <span class="field-tip" data-tip="Password for the PBM backup agent (passed as pbmpwd).">ⓘ</span></label>
+            <input type="password" id="cred_pbmpwd" name="cred_pbmpwd"
+                   value="{{index .Config.AnsibleVars "pbmpwd"}}" placeholder="secretpwd"
+                   autocomplete="new-password">
+          </div>
         </div>
-        <div class="form-group">
-          <label for="cred_pbm_agent_user">PBM Agent User</label>
-          <input type="text" id="cred_pbm_agent_user" name="cred_pbm_agent_user"
-                 value="{{index .Config.AnsibleVars "pbm_agent_user"}}" placeholder="pbmagent">
-        </div>
-        <div class="form-group">
-          <label for="cred_pbmpwd">PBM Agent Password</label>
-          <input type="password" id="cred_pbmpwd" name="cred_pbmpwd"
-                 value="{{index .Config.AnsibleVars "pbmpwd"}}" placeholder="pbmpassword"
-                 autocomplete="new-password">
-        </div>
+        {{end}}
       </div>
     </div>
   </section>
@@ -1348,15 +1346,10 @@
   <!-- ──────────── Ansible Variable Overrides (cloud only) ──────────── -->
   {{if ne $p "docker"}}
   <section class="form-section">
-    <h2>Ansible Variable Overrides</h2>
-    <p style="color:var(--color-muted);margin-bottom:1rem">
-      Values entered here are passed to every <code>ansible-playbook</code> invocation via
-      <code>--extra-vars</code>, overriding defaults in <code>group_vars/all.yml</code>.
-      Typical use: passwords, key material, and cloud storage credentials.
-    </p>
+    <h2>Ansible Variable Overrides <span class="field-tip" data-tip="Values entered here are passed to every ansible-playbook invocation via --extra-vars, overriding defaults in group_vars/all.yml. Typical use: passwords, key material, and cloud storage credentials.">ⓘ</span></h2>
     <div id="ansible-vars-container">
       {{range $k, $v := .Config.AnsibleVars}}
-      {{if not (or (eq $k "mongo_admin_user") (eq $k "mongo_admin_password") (eq $k "pmm_server_user") (eq $k "pmm_server_pwd") (eq $k "pbm_agent_user") (eq $k "mongodb_pmm_user_pwd") (eq $k "pbmpwd"))}}
+      {{if not (or (eq $k "mongo_admin_user") (eq $k "mongo_admin_password") (eq $k "pbm_agent_user") (eq $k "mongodb_pmm_user_pwd") (eq $k "pbmpwd"))}}
       <div class="ansible-var-row">
         <input type="text"     name="ansible_var_key[]"   value="{{$k}}" placeholder="variable_name">
         <input type="password" name="ansible_var_val[]"   value="{{$v}}" placeholder="value"
@@ -1391,6 +1384,15 @@
 </form>
 
 <script>
+function stepNumber(btn, delta) {
+  const input = btn.closest('.number-stepper').querySelector('input[type="number"]');
+  if (!input) return;
+  const min = input.min !== '' ? parseInt(input.min, 10) : -Infinity;
+  const max = input.max !== '' ? parseInt(input.max, 10) : Infinity;
+  const cur = parseInt(input.value, 10);
+  input.value = Math.min(max, Math.max(min, (isNaN(cur) ? 0 : cur) + delta));
+}
+
 const PLATFORM        = {{json .Platform}};
 const PSMDB_IMAGES    = {{json .PSMDBImages}};
 const PBM_IMAGES      = {{json .PBMImages}};
@@ -1424,16 +1426,19 @@ function removeBlock(btn) {
   const block = btn.closest('.component-block');
   const container = block.parentElement;
   block.remove();
-  // If this was a single-server container (PMM/Minio/LDAP), uncheck the toggle.
+  // If this was a single-server container (PMM/Minio/LDAP), uncheck the toggle
+  // and hide the corresponding credential row.
   const toggleMap = {
-    'pmm-servers-container':  'enable-pmm-docker',
-    'minio-servers-container':'enable-minio-docker',
-    'ldap-servers-container': 'enable-ldap-docker',
+    'pmm-servers-container':  { cb: 'enable-pmm-docker' },
+    'minio-servers-container':{ cb: 'enable-minio-docker',  credRow: 'cred-minio-row' },
+    'ldap-servers-container': { cb: 'enable-ldap-docker',   credRow: 'cred-ldap-row' },
   };
-  const cbId = toggleMap[container.id];
-  if (cbId) {
-    const cb = document.getElementById(cbId);
+  const mapping = toggleMap[container.id];
+  if (mapping) {
+    const cb = document.getElementById(mapping.cb);
     if (cb) cb.checked = false;
+    const row = document.getElementById(mapping.credRow);
+    if (row) row.style.display = 'none';
   }
 }
 
@@ -1457,6 +1462,13 @@ function toggleDockerSingleServer(containerId, checkbox, addFn) {
       b.querySelectorAll('input,select,textarea').forEach(f => { f.disabled = true; });
     });
   }
+}
+
+// Show or hide a credential row inside the Credentials section based on whether
+// the corresponding server type (PMM/Minio/LDAP) is included.
+function toggleCredentialRow(rowId, show) {
+  const row = document.getElementById(rowId);
+  if (row) row.style.display = show ? '' : 'none';
 }
 
 // Toggle the PMM cloud-settings sub-panel when the enable_pmm checkbox changes.
@@ -1541,6 +1553,18 @@ function toggleCredentials(btn) {
   const hidden = body.style.display === 'none';
   body.style.display = hidden ? '' : 'none';
   btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
+}
+
+// Toggle a nearby image-selector group element when a PMM/PBM checkbox changes.
+// `group` is 'pmm' or 'pbm'. The function searches within the nearest
+// .customize-body ancestor for an element with the matching data-image-group attribute,
+// so it works correctly for both server-rendered and dynamically added blocks.
+function toggleImageGroup(checkbox, group) {
+  const body = checkbox.closest('.customize-body');
+  if (!body) return;
+  const el = body.querySelector(`[data-image-group="${group}"]`);
+  if (!el) return;
+  el.style.display = checkbox.checked ? '' : 'none';
 }
 
 // Toggle the per-block .customize-body panel (clusters, replsets, Docker servers).
@@ -1651,8 +1675,8 @@ function buildDockerImageRows(type) {
     `<option value="__custom__">Custom…</option>`;
   const pmmcSel  = PMM_CLIENT_IMAGES.map(t => `<option value="${escHtml(t)}">percona/pmm-client:${escHtml(t)}</option>`).join('') +
     `<option value="__custom__">Custom…</option>`;
-  const makeImageGroup = (label, selectName, options) => `
-    <div class="form-group"><label>${label}</label>
+  const makeImageGroup = (label, tip, selectName, options, dataGroup) => `
+    <div class="form-group"${dataGroup ? ` data-image-group="${dataGroup}" style="display:none"` : ''}><label>${label} <span class="field-tip" data-tip="${tip}">ⓘ</span></label>
       <div class="image-select-wrapper">
         <select name="${type}_${selectName}" onchange="toggleCustomImageInput(this)">${options}</select>
         <input type="text" class="custom-image-input" name="${type}_${selectName}_custom"
@@ -1662,17 +1686,19 @@ function buildDockerImageRows(type) {
     </div>`;
   return `
     <div class="form-row">
-      ${makeImageGroup('PSMDB Image', 'psmdb_image[]', psmdbSel)}
-      ${makeImageGroup('PBM Image', 'pbm_image[]', pbmSel)}
-      ${makeImageGroup('PMM Client Image', 'pmm_client_image[]', pmmcSel)}
-    </div>
-    <div class="form-row">
       <div class="form-group form-group-checkbox">
-        <label><input type="checkbox" name="${type}_enable_pmm[]" value="1"> Enable PMM monitoring</label></div>
+        <label><input type="checkbox" name="${type}_enable_pmm[]" value="1"
+          onchange="toggleImageGroup(this,'pmm')"> Enable PMM monitoring</label></div>
       <div class="form-group form-group-checkbox">
-        <label><input type="checkbox" name="${type}_enable_pbm[]" value="1"> Enable PBM backups</label></div>
+        <label><input type="checkbox" name="${type}_enable_pbm[]" value="1"
+          onchange="toggleImageGroup(this,'pbm')"> Enable PBM backups</label></div>
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" name="${type}_bind_to_localhost[]" value="1"> Bind ports to localhost only</label></div>
+    </div>
+    <div class="form-row">
+      ${makeImageGroup('PSMDB Image', 'Percona Server for MongoDB Docker image tag for nodes in this block.', 'psmdb_image[]', psmdbSel, null)}
+      ${makeImageGroup('PBM Image', 'Percona Backup for MongoDB Docker image tag for backup agents.', 'pbm_image[]', pbmSel, 'pbm')}
+      ${makeImageGroup('PMM Client Image', 'PMM Client Docker image tag for monitoring nodes.', 'pmm_client_image[]', pmmcSel, 'pmm')}
     </div>`;
 }
 
@@ -1684,19 +1710,19 @@ function buildCloudComputeRows(type) {
     if (type === 'cluster') {
       rows = `
         <div class="form-row">
-          <div class="form-group"><label>Shard Svr vCPU</label>
+          <div class="form-group"><label>Shard Svr vCPU <span class="field-tip" data-tip="Number of virtual CPUs for shard server instances.">ⓘ</span></label>
             <select name="shardsvr_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Shard Svr Memory (GB)</label>
+          <div class="form-group"><label>Shard Svr Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for shard server instances.">ⓘ</span></label>
             <select name="shardsvr_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
               <option value="16">16 GB</option>
             </select></div>
-          <div class="form-group"><label>Shard Svr Disk (GB)</label>
+          <div class="form-group"><label>Shard Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for shard server instances.">ⓘ</span></label>
             <select name="shardsvr_volume_size">
               <option value="20" selected>20 GB</option>
               <option value="40">40 GB</option>
@@ -1706,19 +1732,19 @@ function buildCloudComputeRows(type) {
             </select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Config Svr vCPU</label>
+          <div class="form-group"><label>Config Svr vCPU <span class="field-tip" data-tip="Number of virtual CPUs for config server instances.">ⓘ</span></label>
             <select name="configsvr_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Config Svr Memory (GB)</label>
+          <div class="form-group"><label>Config Svr Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for config server instances.">ⓘ</span></label>
             <select name="configsvr_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
               <option value="16">16 GB</option>
             </select></div>
-          <div class="form-group"><label>Config Svr Disk (GB)</label>
+          <div class="form-group"><label>Config Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for config server instances.">ⓘ</span></label>
             <select name="configsvr_volume_size">
               <option value="20" selected>20 GB</option>
               <option value="40">40 GB</option>
@@ -1728,25 +1754,25 @@ function buildCloudComputeRows(type) {
             </select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Mongos vCPU</label>
+          <div class="form-group"><label>Mongos vCPU <span class="field-tip" data-tip="Number of virtual CPUs for mongos router instances.">ⓘ</span></label>
             <select name="mongos_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Mongos Memory (GB)</label>
+          <div class="form-group"><label>Mongos Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for mongos router instances.">ⓘ</span></label>
             <select name="mongos_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
               <option value="16">16 GB</option>
             </select></div>
-          <div class="form-group"><label>Arbiter vCPU</label>
+          <div class="form-group"><label>Arbiter vCPU <span class="field-tip" data-tip="Number of virtual CPUs for arbiter instances.">ⓘ</span></label>
             <select name="arbiter_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Arbiter Memory (GB)</label>
+          <div class="form-group"><label>Arbiter Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for arbiter instances.">ⓘ</span></label>
             <select name="arbiter_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
@@ -1756,19 +1782,19 @@ function buildCloudComputeRows(type) {
     } else {
       rows = `
         <div class="form-row">
-          <div class="form-group"><label>Data Node vCPU</label>
+          <div class="form-group"><label>Data Node vCPU <span class="field-tip" data-tip="Number of virtual CPUs for data node instances.">ⓘ</span></label>
             <select name="replsetsvr_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Data Node Memory (GB)</label>
+          <div class="form-group"><label>Data Node Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for data node instances.">ⓘ</span></label>
             <select name="replsetsvr_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
               <option value="16">16 GB</option>
             </select></div>
-          <div class="form-group"><label>Data Node Disk (GB)</label>
+          <div class="form-group"><label>Data Node Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for data node instances.">ⓘ</span></label>
             <select name="replsetsvr_volume_size">
               <option value="20" selected>20 GB</option>
               <option value="40">40 GB</option>
@@ -1778,13 +1804,13 @@ function buildCloudComputeRows(type) {
             </select></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Arbiter vCPU</label>
+          <div class="form-group"><label>Arbiter vCPU <span class="field-tip" data-tip="Number of virtual CPUs for arbiter instances.">ⓘ</span></label>
             <select name="arbiter_cpu_cores">
               <option value="2" selected>2 vCPU</option>
               <option value="4">4 vCPU</option>
               <option value="8">8 vCPU</option>
             </select></div>
-          <div class="form-group"><label>Arbiter Memory (GB)</label>
+          <div class="form-group"><label>Arbiter Memory (GB) <span class="field-tip" data-tip="Memory size (GB) for arbiter instances.">ⓘ</span></label>
             <select name="arbiter_memory_gb">
               <option value="4" selected>4 GB</option>
               <option value="8">8 GB</option>
@@ -1809,40 +1835,40 @@ function buildCloudComputeRows(type) {
   if (type === 'cluster') {
     rows = `
       <div class="form-row">
-        <div class="form-group"><label>Shard Svr Instance Type</label>
+        <div class="form-group"><label>Shard Svr Instance Type <span class="field-tip" data-tip="Cloud instance type for shard server nodes (e.g. t3.medium for AWS).">ⓘ</span></label>
           <input type="text" name="shardsvr_type" placeholder="${escHtml(ph)}"></div>
-        <div class="form-group"><label>Shard Svr Disk (GB)</label>
+        <div class="form-group"><label>Shard Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for shard server instances.">ⓘ</span></label>
           <input type="number" name="shardsvr_volume_size" placeholder="50" min="10"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Config Svr Instance Type</label>
+        <div class="form-group"><label>Config Svr Instance Type <span class="field-tip" data-tip="Cloud instance type for config server nodes.">ⓘ</span></label>
           <input type="text" name="configsvr_type" placeholder="${escHtml(ph)}"></div>
-        <div class="form-group"><label>Config Svr Disk (GB)</label>
+        <div class="form-group"><label>Config Svr Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for config server instances.">ⓘ</span></label>
           <input type="number" name="configsvr_volume_size" placeholder="20" min="10"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Mongos Instance Type</label>
+        <div class="form-group"><label>Mongos Instance Type <span class="field-tip" data-tip="Cloud instance type for mongos router nodes.">ⓘ</span></label>
           <input type="text" name="mongos_type" placeholder="${escHtml(ph)}"></div>
-        <div class="form-group"><label>Arbiter Instance Type</label>
+        <div class="form-group"><label>Arbiter Instance Type <span class="field-tip" data-tip="Cloud instance type for arbiter nodes.">ⓘ</span></label>
           <input type="text" name="arbiter_type" placeholder="${escHtml(ph)}"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Data Disk Type</label>
+        <div class="form-group"><label>Data Disk Type <span class="field-tip" data-tip="Disk type for data volumes (e.g. gp2 for AWS, pd-standard for GCP).">ⓘ</span></label>
           <input type="text" name="data_disk_type" placeholder="${escHtml(diskPh)}">
           <small>${escHtml(diskHint)}</small></div>
       </div>`;
   } else {
     rows = `
       <div class="form-row">
-        <div class="form-group"><label>Data Node Instance Type</label>
+        <div class="form-group"><label>Data Node Instance Type <span class="field-tip" data-tip="Cloud instance type for replica set data nodes.">ⓘ</span></label>
           <input type="text" name="replsetsvr_type" placeholder="${escHtml(ph)}"></div>
-        <div class="form-group"><label>Data Node Disk (GB)</label>
+        <div class="form-group"><label>Data Node Disk (GB) <span class="field-tip" data-tip="Data disk size (GB) for data node instances.">ⓘ</span></label>
           <input type="number" name="replsetsvr_volume_size" placeholder="100" min="10"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Arbiter Instance Type</label>
+        <div class="form-group"><label>Arbiter Instance Type <span class="field-tip" data-tip="Cloud instance type for arbiter nodes.">ⓘ</span></label>
           <input type="text" name="arbiter_type" placeholder="${escHtml(ph)}"></div>
-        <div class="form-group"><label>Data Disk Type</label>
+        <div class="form-group"><label>Data Disk Type <span class="field-tip" data-tip="Disk type for data volumes (e.g. gp2 for AWS, pd-standard for GCP).">ⓘ</span></label>
           <input type="text" name="data_disk_type" placeholder="${escHtml(diskPh)}">
           <small>${escHtml(diskHint)}</small></div>
       </div>`;
@@ -1877,18 +1903,15 @@ function addCluster() {
     </div>
     <div class="customize-body" style="display:none">
       <div class="form-row">
-        <div class="form-group"><label>Env Tag</label>
+        <div class="form-group"><label>Env Tag <span class="field-tip" data-tip="Tag applied to resources in this cluster (e.g. test, prod).">ⓘ</span></label>
           <input type="text" name="cluster_env_tag[]" value="test"></div>
-        <div class="form-group"><label>Config Servers</label>
-          <input type="number" name="cluster_configsvr_count[]" value="3" min="1" max="7"></div>
-        <div class="form-group"><label>Shards</label>
-          <input type="number" name="cluster_shard_count[]" value="2" min="1" max="10"></div>
-        <div class="form-group"><label>Replicas / Shard</label>
-          <input type="number" name="cluster_shardsvr_replicas[]" value="2" min="1" max="7"></div>
-        <div class="form-group"><label>Arbiters / Shard</label>
-          <input type="number" name="cluster_arbiters_per_replset[]" value="1" min="0" max="3"></div>
-        <div class="form-group"><label>Mongos Routers</label>
-          <input type="number" name="cluster_mongos_count[]" value="2" min="1" max="10"></div>
+        <div class="form-group"><label>Config Servers <span class="field-tip" data-tip="Number of config server replica set members (CSRS). Use an odd number, typically 3.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_configsvr_count[]" value="3" min="1" max="7"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+        <div class="form-group"><label>Mongos Routers <span class="field-tip" data-tip="Number of mongos query router instances.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_mongos_count[]" value="2" min="1" max="10"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Shards <span class="field-tip" data-tip="Number of shards in this cluster.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_shard_count[]" value="2" min="1" max="10"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+        <div class="form-group"><label>Replicas / Shard <span class="field-tip" data-tip="Number of data-bearing replica set members per shard.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_shardsvr_replicas[]" value="2" min="1" max="7"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+        <div class="form-group"><label>Arbiters / Shard <span class="field-tip" data-tip="Number of arbiters per shard replica set. Use 0 for none.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_arbiters_per_replset[]" value="1" min="0" max="3"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
       </div>
       ${dockerRows}${computeRows}
     </div>`;
@@ -1916,16 +1939,13 @@ function addReplset() {
     </div>
     <div class="customize-body" style="display:none">
       <div class="form-row">
-        <div class="form-group"><label>Env Tag</label>
+        <div class="form-group"><label>Env Tag <span class="field-tip" data-tip="Tag applied to resources in this cluster (e.g. test, prod).">ⓘ</span></label>
           <input type="text" name="replset_env_tag[]" value="test"></div>
-        <div class="form-group"><label>Data Nodes</label>
-          <input type="number" name="replset_data_nodes[]" value="2" min="1" max="7"></div>
-        <div class="form-group"><label>Arbiters</label>
-          <input type="number" name="replset_arbiters[]" value="1" min="0" max="3"></div>
-        ${PLATFORM === 'docker' ? `<div class="form-group"><label>Base Port</label>
-          <input type="number" name="replset_port[]" value="${randomPort}" placeholder="auto" min="1024" max="65000"
-                 title="Auto-assigned random port to avoid collisions with other replica sets.">
-          <small>Auto-assigned on creation.</small></div>` : ''}
+        <div class="form-group"><label>Data Nodes <span class="field-tip" data-tip="Number of data-bearing replica set members.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="replset_data_nodes[]" value="2" min="1" max="7"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+        <div class="form-group"><label>Arbiters <span class="field-tip" data-tip="Number of arbiters in this replica set. Use 0 for none.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="replset_arbiters[]" value="1" min="0" max="3"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
+        ${PLATFORM === 'docker' ? `<div class="form-group"><label>Base Port <span class="field-tip" data-tip="Starting port number for data nodes. Auto-assigned to avoid collisions between replica sets.">ⓘ</span></label>
+          <input type="number" name="replset_port[]" value="${randomPort}" placeholder="auto" min="1024" max="65000">
+          </div>` : ''}
       </div>
       ${dockerRows}${computeRows}
     </div>`;
@@ -1949,18 +1969,14 @@ function addPmmServer() {
     </div>
     <div class="customize-body" style="display:none">
       <div class="form-row">
-        <div class="form-group"><label>PMM Server Image</label>
+        <div class="form-group"><label>PMM Server Image <span class="field-tip" data-tip="Percona PMM Server Docker image tag.">ⓘ</span></label>
           <select name="pmm_server_image[]">
             ${PMM_SERVER_IMAGES.map(t => `<option value="${escHtml(t)}">percona/pmm-server:${escHtml(t)}</option>`).join('')}
           </select></div>
-        <div class="form-group"><label>PMM Port</label>
+        <div class="form-group"><label>PMM Port <span class="field-tip" data-tip="Host port exposed for the PMM Server HTTPS interface (default: 8443).">ⓘ</span></label>
           <input type="number" name="pmm_server_port[]" value="8443"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Admin User</label>
-          <input type="text" name="pmm_server_user[]" value="admin"></div>
-        <div class="form-group"><label>Admin Password</label>
-          <input type="password" name="pmm_server_pwd[]" placeholder="admin"></div>
         <div class="form-group form-group-checkbox">
           <label><input type="checkbox" name="pmm_server_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
@@ -1985,22 +2001,18 @@ function addMinioServer() {
     </div>
     <div class="customize-body" style="display:none">
       <div class="form-row">
-        <div class="form-group"><label>Minio Image</label>
+        <div class="form-group"><label>Minio Image <span class="field-tip" data-tip="Minio Docker image to use.">ⓘ</span></label>
           <input type="text" name="minio_image[]" value="minio/minio"></div>
-        <div class="form-group"><label>API Port</label>
+        <div class="form-group"><label>API Port <span class="field-tip" data-tip="Host port for the Minio S3 API (default: 9000).">ⓘ</span></label>
           <input type="number" name="minio_port[]" value="9000"></div>
-        <div class="form-group"><label>Console Port</label>
+        <div class="form-group"><label>Console Port <span class="field-tip" data-tip="Host port for the Minio web console (default: 9001).">ⓘ</span></label>
           <input type="number" name="minio_console_port[]" value="9001"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Bucket Name</label>
+        <div class="form-group"><label>Bucket Name <span class="field-tip" data-tip="Default S3 bucket name for MongoDB backups.">ⓘ</span></label>
           <input type="text" name="minio_bucket_name[]" value="mongo-backups"></div>
-        <div class="form-group"><label>Retention (days)</label>
+        <div class="form-group"><label>Retention (days) <span class="field-tip" data-tip="Number of days to keep backups before expiry.">ⓘ</span></label>
           <input type="number" name="minio_backup_retention[]" value="2" min="1"></div>
-        <div class="form-group"><label>Access Key</label>
-          <input type="text" name="minio_access_key[]" value="minio"></div>
-        <div class="form-group"><label>Secret Key</label>
-          <input type="password" name="minio_secret_key[]" value="minioadmin"></div>
         <div class="form-group form-group-checkbox">
           <label><input type="checkbox" name="minio_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
@@ -2025,16 +2037,14 @@ function addLdapServer() {
     </div>
     <div class="customize-body" style="display:none">
       <div class="form-row">
-        <div class="form-group"><label>LDAP Image</label>
+        <div class="form-group"><label>LDAP Image <span class="field-tip" data-tip="OpenLDAP Docker image to use.">ⓘ</span></label>
           <input type="text" name="ldap_image[]" value="osixia/openldap:1.5.0"></div>
-        <div class="form-group"><label>Port</label>
+        <div class="form-group"><label>Port <span class="field-tip" data-tip="Host port for the LDAP service (default: 389).">ⓘ</span></label>
           <input type="number" name="ldap_port[]" value="389"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Domain</label>
+        <div class="form-group"><label>Domain <span class="field-tip" data-tip="LDAP base domain (e.g. example.org).">ⓘ</span></label>
           <input type="text" name="ldap_domain[]" value="example.org"></div>
-        <div class="form-group"><label>Admin Password</label>
-          <input type="password" name="ldap_admin_password[]" value="admin"></div>
         <div class="form-group form-group-checkbox">
           <label><input type="checkbox" name="ldap_bind_localhost[]" value="1" checked> Bind to localhost only</label></div>
       </div>
@@ -2437,8 +2447,6 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   const credFields = [
     ['mongo_admin_user',      fd.get('cred_mongo_admin_user')],
     ['mongo_admin_password',  fd.get('cred_mongo_admin_password')],
-    ['pmm_server_user',       fd.get('cred_pmm_server_user')],
-    ['pmm_server_pwd',        fd.get('cred_pmm_server_pwd')],
     ['pbm_agent_user',        fd.get('cred_pbm_agent_user')],
     ['pbmpwd',                fd.get('cred_pbmpwd')],
   ];
@@ -2490,7 +2498,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
       configsvr_count: parseInt(clCfgsvr[i]) || 3,
       shard_count: parseInt(clShards[i]) || 2,
       shardsvr_replicas: parseInt(clReplicas[i]) || 2,
-      arbiters_per_replset: parseInt(clArbiters[i]) || 1,
+      arbiters_per_replset: parseInt(clArbiters[i] || '1'),
       mongos_count: parseInt(clMongos[i]) || 2,
     };
     if (PLATFORM === 'docker') {
@@ -2524,8 +2532,8 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     if (!name) continue;
     const r = {
       env_tag: rsEnvTag[i] || 'test',
-      data_nodes_per_replset: parseInt(rsNodes[i]) || 2,
-      arbiters_per_replset: parseInt(rsArbiters[i]) || 1,
+      data_nodes_per_replset: parseInt(rsNodes[i] || '2'),
+      arbiters_per_replset: parseInt(rsArbiters[i] || '1'),
     };
     if (PLATFORM === 'docker') {
       const resolveDockerImg = (prefix, tag, customVal) =>
@@ -2547,8 +2555,6 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     const pNames  = fd.getAll('pmm_server_name[]');
     const pImages = fd.getAll('pmm_server_image[]');
     const pPorts  = fd.getAll('pmm_server_port[]');
-    const pUsers  = fd.getAll('pmm_server_user[]');
-    const pPwds   = fd.getAll('pmm_server_pwd[]');
     const pBind   = fd.getAll('pmm_server_bind_localhost[]');
     config.pmm_servers = {};
     for (let i = 0; i < pNames.length; i++) {
@@ -2558,22 +2564,21 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
         env_tag: 'test',
         pmm_server_image: `percona/pmm-server:${pImages[i] || 'latest'}`,
         pmm_port: parseInt(pPorts[i]) || 8443,
-        pmm_server_user: pUsers[i] || 'admin',
-        pmm_server_pwd:  pPwds[i]  || 'admin',
+        // pmm_server_user/pwd not set here – they use the Terraform defaults
         bind_to_localhost: pBind.some((v,idx) => idx === i && v === '1'),
       };
     }
 
-    // Minio Servers
+    // Minio Servers – access/secret key come from the Credentials section
     const mNames   = fd.getAll('minio_server_name[]');
     const mImages  = fd.getAll('minio_image[]');
     const mPorts   = fd.getAll('minio_port[]');
     const mCPorts  = fd.getAll('minio_console_port[]');
     const mBuckets = fd.getAll('minio_bucket_name[]');
     const mRet     = fd.getAll('minio_backup_retention[]');
-    const mAccess  = fd.getAll('minio_access_key[]');
-    const mSecret  = fd.getAll('minio_secret_key[]');
     const mBind    = fd.getAll('minio_bind_localhost[]');
+    const credMinioAccess = fd.get('cred_minio_access_key');
+    const credMinioSecret = fd.get('cred_minio_secret_key');
     config.minio_servers = {};
     for (let i = 0; i < mNames.length; i++) {
       const name = mNames[i].trim();
@@ -2585,30 +2590,30 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
         minio_console_port: parseInt(mCPorts[i]) || 9001,
         bucket_name:        mBuckets[i] || 'mongo-backups',
         backup_retention:   parseInt(mRet[i])    || 2,
-        minio_access_key:   mAccess[i]  || 'minio',
-        minio_secret_key:   mSecret[i]  || 'minioadmin',
+        minio_access_key:   credMinioAccess || 'minio',
+        minio_secret_key:   credMinioSecret || 'minioadmin',
         bind_to_localhost:  mBind.some((v,idx) => idx === i && v === '1'),
       };
     }
 
-    // LDAP Servers
+    // LDAP Servers – admin password comes from the Credentials section
     const lNames  = fd.getAll('ldap_server_name[]');
     const lImages = fd.getAll('ldap_image[]');
     const lPorts  = fd.getAll('ldap_port[]');
     const lDomains= fd.getAll('ldap_domain[]');
-    const lPwds   = fd.getAll('ldap_admin_password[]');
     const lBind   = fd.getAll('ldap_bind_localhost[]');
+    const credLdapPwd = fd.get('cred_ldap_admin_password');
     config.ldap_servers = {};
     for (let i = 0; i < lNames.length; i++) {
       const name = lNames[i].trim();
       if (!name) continue;
       config.ldap_servers[name] = {
         env_tag: 'test',
-        ldap_image:         lImages[i]  || 'osixia/openldap:1.5.0',
-        ldap_port:          parseInt(lPorts[i]) || 389,
-        ldap_domain:        lDomains[i] || 'example.org',
-        ldap_admin_password:lPwds[i]    || 'admin',
-        bind_to_localhost:  lBind.some((v,idx) => idx === i && v === '1'),
+        ldap_image:          lImages[i]  || 'osixia/openldap:1.5.0',
+        ldap_port:           parseInt(lPorts[i]) || 389,
+        ldap_domain:         lDomains[i] || 'example.org',
+        ldap_admin_password: credLdapPwd || 'admin',
+        bind_to_localhost:   lBind.some((v,idx) => idx === i && v === '1'),
       };
     }
   }

@@ -15,7 +15,7 @@ type ClusterConfig struct {
 	ConfigsvrCount    int    `json:"configsvr_count"`
 	ShardCount        int    `json:"shard_count"`
 	ShardsvrReplicas  int    `json:"shardsvr_replicas"`
-	ArbitersPerReplset int   `json:"arbiters_per_replset"`
+	ArbitersPerReplset *int  `json:"arbiters_per_replset,omitempty"`
 	MongosCount       int    `json:"mongos_count"`
 	// Docker-only
 	PsmdbImage     string `json:"psmdb_image,omitempty"`
@@ -30,7 +30,7 @@ type ClusterConfig struct {
 type ReplsetConfig struct {
 	EnvTag             string `json:"env_tag"`
 	DataNodesPerReplset int   `json:"data_nodes_per_replset"`
-	ArbitersPerReplset  int   `json:"arbiters_per_replset"`
+	ArbitersPerReplset  *int  `json:"arbiters_per_replset,omitempty"`
 	// Docker-only port assignment: starting port for data nodes and arbiters.
 	// Auto-assigned on save to avoid collisions between multiple replica sets.
 	ReplsetPort    int    `json:"replset_port,omitempty"`
@@ -365,4 +365,19 @@ type CloudImage struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+}
+
+// PrereqTool describes a single prerequisite tool and whether it is installed.
+type PrereqTool struct {
+Name        string `json:"name"`
+Installed   bool   `json:"installed"`
+InstallDoc  string `json:"install_doc"`   // short URL / reference
+InstallCmds []string `json:"install_cmds"` // copy-pasteable shell commands
+}
+
+// PrereqResult is the JSON response from GET /api/prerequisites/{platform}.
+type PrereqResult struct {
+Platform string       `json:"platform"`
+OK       bool         `json:"ok"` // true when all tools are installed
+Tools    []PrereqTool `json:"tools"`
 }

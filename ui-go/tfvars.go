@@ -15,6 +15,17 @@ func tfvarsPath(envID, platform string) string {
 	return filepath.Join(terraformDir, platform, envID+".tfvars")
 }
 
+// tfstatePath returns the path for the env's Terraform state file.
+// Terraform also writes a backup alongside it; use tfstateBackupPath for that.
+func tfstatePath(envID, platform string) string {
+	return filepath.Join(terraformDir, platform, envID+".tfstate")
+}
+
+// tfstateBackupPath returns the path for the env's Terraform state backup file.
+func tfstateBackupPath(envID, platform string) string {
+	return filepath.Join(terraformDir, platform, envID+".tfstate.backup")
+}
+
 // formatHCLVal formats a Go value as an HCL literal.
 func formatHCLVal(v interface{}) string {
 	switch t := v.(type) {
@@ -261,6 +272,16 @@ func writeTfvars(envID, platform string, cfg Config) error {
 		writeOptStr("network_name", cfg.NetworkName)
 	}
 
+	// ── Docker credential helpers ─────────────────────────────────────────────
+	// Credentials entered in the UI are stored in cfg.AnsibleVars (keyed by
+	// Ansible variable name).  For Docker environments Ansible is not invoked,
+	// so we read the credential values here and inject them as Terraform
+	// per-cluster/replset variables.
+	dockerMongoRootPassword := ""
+	if platform == "docker" && len(cfg.AnsibleVars) > 0 {
+		dockerMongoRootPassword = cfg.AnsibleVars["mongo_admin_password"]
+	}
+
 	// ── clusters – always write (even as empty map) to override Terraform defaults ──
 	write("")
 	clusters := cfg.Clusters
@@ -275,7 +296,7 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write(fmt.Sprintf("    configsvr_count = %s", formatHCLVal(intDefault(c.ConfigsvrCount, 3))))
 			write(fmt.Sprintf("    shard_count = %s", formatHCLVal(intDefault(c.ShardCount, 2))))
 			write(fmt.Sprintf("    shardsvr_replicas = %s", formatHCLVal(intDefault(c.ShardsvrReplicas, 2))))
-			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intDefault(c.ArbitersPerReplset, 1))))
+			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intPtrDefault(c.ArbitersPerReplset, 1))))
 			write(fmt.Sprintf("    mongos_count = %s", formatHCLVal(intDefault(c.MongosCount, 2))))
 			if platform == "docker" {
 				if c.PsmdbImage != "" {
@@ -290,6 +311,9 @@ func writeTfvars(envID, platform string, cfg Config) error {
 				write(fmt.Sprintf("    enable_pmm = %s", formatHCLVal(c.EnablePmm)))
 				write(fmt.Sprintf("    enable_pbm = %s", formatHCLVal(c.EnablePbm)))
 				write(fmt.Sprintf("    bind_to_localhost = %s", formatHCLVal(c.BindToLocalhost)))
+				if dockerMongoRootPassword != "" {
+					write(fmt.Sprintf("    mongodb_root_password = %s", formatHCLVal(dockerMongoRootPassword)))
+				}
 			}
 			write("  }")
 		}
@@ -308,7 +332,7 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write(fmt.Sprintf("  %q = {", name))
 			write(fmt.Sprintf("    env_tag = %s", formatHCLVal(strDefault(r.EnvTag, "test"))))
 			write(fmt.Sprintf("    data_nodes_per_replset = %s", formatHCLVal(intDefault(r.DataNodesPerReplset, 2))))
-			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intDefault(r.ArbitersPerReplset, 1))))
+			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intPtrDefault(r.ArbitersPerReplset, 1))))
 			if platform == "docker" {
 				if r.ReplsetPort != 0 {
 					write(fmt.Sprintf("    replset_port = %s", formatHCLVal(r.ReplsetPort)))
@@ -328,6 +352,9 @@ func writeTfvars(envID, platform string, cfg Config) error {
 				write(fmt.Sprintf("    enable_pmm = %s", formatHCLVal(r.EnablePmm)))
 				write(fmt.Sprintf("    enable_pbm = %s", formatHCLVal(r.EnablePbm)))
 				write(fmt.Sprintf("    bind_to_localhost = %s", formatHCLVal(r.BindToLocalhost)))
+				if dockerMongoRootPassword != "" {
+					write(fmt.Sprintf("    mongodb_root_password = %s", formatHCLVal(dockerMongoRootPassword)))
+				}
 			}
 			write("  }")
 		}

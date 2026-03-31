@@ -96,7 +96,13 @@ func collectDockerHosts(envID string, env *Environment) ([]HostInfo, []ServiceUR
 func guessDockerRole(name, prefix string) string {
 	base := strings.TrimPrefix(name, prefix+"-")
 	switch {
-	case strings.HasSuffix(base, "-pmm-client") || strings.HasSuffix(base, "-pmm"):
+	case strings.HasSuffix(base, "-pbm-agent"):
+		return "pbm-agent"
+	case strings.HasSuffix(base, "-pbm-cli"):
+		return "pbm-cli"
+	case strings.HasSuffix(base, "-pmm-client"):
+		return "pmm-client"
+	case strings.HasSuffix(base, "-pmm"):
 		return "pmm"
 	case strings.Contains(base, "svr"):
 		return "mongod"
@@ -120,8 +126,13 @@ func guessDockerRole(name, prefix string) string {
 // guessDockerGroup extracts the logical group (cluster/replset name) from a
 // container name.
 func guessDockerGroup(name, prefix string) string {
-	if guessDockerRole(name, prefix) == "pmm" {
+	switch guessDockerRole(name, prefix) {
+	case "pmm":
 		return "PMM"
+	case "pmm-client":
+		return "PMM Clients"
+	case "pbm-agent", "pbm-cli":
+		return "PBM"
 	}
 	base := strings.TrimPrefix(name, prefix+"-")
 	parts := strings.Split(base, "-")
@@ -170,9 +181,22 @@ func buildDockerMongoConns(envID string, env *Environment) []MongoConnInfo {
 		if mongosCount == 0 {
 			mongosCount = 2
 		}
+		// Build connection string using the actual host ports of the mongos
+		// containers.  Each container is named "{prefix}-{cluster}-mongos0{i}"
+		// (matching the Terraform mongos_tag default "mongos") and exposes a
+		// single port.  We query Docker for the external host port so the
+		// string is correct regardless of which port Docker chose.
+		clusterPrefix := prefix + "-" + name
 		var mongosHosts []string
 		for i := 0; i < mongosCount; i++ {
-			mongosHosts = append(mongosHosts, fmt.Sprintf("%s:%d", host, 27017+i))
+			containerName := fmt.Sprintf("%s-mongos0%d", clusterPrefix, i)
+			hostPort := dockerContainerHostPort(containerName)
+			if hostPort == "" {
+				// Docker not available or container not running – fall back to
+				// the well-known default port so something is shown.
+				hostPort = "27017"
+			}
+			mongosHosts = append(mongosHosts, fmt.Sprintf("%s:%s", host, hostPort))
 		}
 		connStr := fmt.Sprintf("mongodb://%s:%s@%s/?authSource=admin",
 			url.QueryEscape(user), encodedPass, strings.Join(mongosHosts, ","))
@@ -185,6 +209,30 @@ func buildDockerMongoConns(envID string, env *Environment) []MongoConnInfo {
 		})
 	}
 	return conns
+}
+
+// dockerContainerHostPort returns the first external host port bound for the
+// given Docker container.  It uses "docker inspect" with a Go template that
+// iterates over NetworkSettings.Ports (populated for running containers,
+// contains the actual auto-assigned port).  HostConfig.PortBindings is NOT
+// used because when Terraform omits an explicit external port, Docker records
+// HostPort as "0" there (meaning "auto-assign"), and the real port only
+// appears in NetworkSettings.Ports once the container is running.
+// Returns an empty string when the container is not found, not running, or
+// has no port bindings.
+func dockerContainerHostPort(containerName string) string {
+	out, err := execOutput("docker", "inspect",
+		"--format", `{{range $p, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}} {{end}}{{end}}`,
+		containerName)
+	if err != nil {
+		return ""
+	}
+	for _, f := range strings.Fields(out) {
+		if f != "" && f != "0" {
+			return f
+		}
+	}
+	return ""
 }
 
 // mongoAdminCredentials returns the MongoDB admin username and password for
