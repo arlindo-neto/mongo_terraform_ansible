@@ -108,11 +108,19 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	envID := r.URL.Query().Get("env_id")
 	var cfg Config
+	dockerDefaultPmmExternalPort := 8443
+	dockerDefaultMinioPort := 9000
+	dockerDefaultMinioConsolePort := 9001
+	state, _ := loadState()
 	if envID != "" {
-		state, _ := loadState()
 		if env, ok := state[envID]; ok {
 			cfg = env.Config
 		}
+	}
+	if platform == "docker" {
+		occupied := dockerOccupiedServicePorts(state, envID)
+		dockerDefaultPmmExternalPort = nextFreeDockerPort(8443, occupied)
+		dockerDefaultMinioPort, dockerDefaultMinioConsolePort = nextFreeDockerPortPair(9000, occupied)
 	}
 
 	// Get current OS user for SSH user field default.
@@ -125,22 +133,25 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderPage(w, "configure", ConfigureData{
-		Platform:           platform,
-		EnvID:              envID,
-		Config:             cfg,
-		OSUser:             osUser,
-		PSMDBVersions:      cachedPSMDBVersions(),
-		PBMVersions:        cachedPBMVersions(),
-		PSMDBMinorVersions: cachedPSMDBMinorVersionsByMajor(),
-		PMMImages:          cachedPMMServerImages(),
-		PSMDBImages:        cachedPSMDBImages(),
-		PBMImages:          cachedPBMImages(),
-		PMMClientImages:    cachedPMMClientImages(),
-		SortedClusters:     sortedClusters(cfg.Clusters),
-		SortedReplsets:     sortedReplsets(cfg.Replsets),
-		SortedPmmServers:   sortedPmmServers(cfg.PmmServers),
-		SortedMinio:        sortedMinioServers(cfg.MinioServers),
-		SortedLdap:         sortedLdapServers(cfg.LdapServers),
+		Platform:                      platform,
+		EnvID:                         envID,
+		Config:                        cfg,
+		OSUser:                        osUser,
+		DockerDefaultPmmExternalPort:  dockerDefaultPmmExternalPort,
+		DockerDefaultMinioPort:        dockerDefaultMinioPort,
+		DockerDefaultMinioConsolePort: dockerDefaultMinioConsolePort,
+		PSMDBVersions:                 cachedPSMDBVersions(),
+		PBMVersions:                   cachedPBMVersions(),
+		PSMDBMinorVersions:            cachedPSMDBMinorVersionsByMajor(),
+		PMMImages:                     cachedPMMServerImages(),
+		PSMDBImages:                   cachedPSMDBImages(),
+		PBMImages:                     cachedPBMImages(),
+		PMMClientImages:               cachedPMMClientImages(),
+		SortedClusters:                sortedClusters(cfg.Clusters),
+		SortedReplsets:                sortedReplsets(cfg.Replsets),
+		SortedPmmServers:              sortedPmmServers(cfg.PmmServers),
+		SortedMinio:                   sortedMinioServers(cfg.MinioServers),
+		SortedLdap:                    sortedLdapServers(cfg.LdapServers),
 	})
 }
 
@@ -277,15 +288,20 @@ func saveEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	// For Docker deployments, auto-assign unique port ranges to replica sets
 	// that don't yet have a port assigned, to prevent collisions.
+	state, err := loadState()
+	if err != nil {
+		jsonError(w, 500, "state load failed: "+err.Error())
+		return
+	}
+
 	if payload.Platform == "docker" {
 		assignDockerReplsetPorts(&payload.Config)
-		if err := validateDockerPortConflicts(payload.Config); err != nil {
+		if err := validateDockerPortConflicts(payload.EnvID, payload.Config, state); err != nil {
 			jsonError(w, 400, err.Error())
 			return
 		}
 	}
 
-	state, _ := loadState()
 	existing := state[payload.EnvID]
 	status := "configured"
 	createdAt := time.Now().UTC().Format(time.RFC3339)
@@ -667,7 +683,7 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "deploy":
 		shellCmd := fmt.Sprintf(
-			"terraform init -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
+			"terraform init -reconfigure -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
 			backendPathArg,
 			shellQuote(varfile),
 		)
@@ -683,7 +699,7 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		shellCmd := fmt.Sprintf(
-			"terraform init -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
+			"terraform init -reconfigure -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
 			backendPathArg,
 			shellQuote(varfile),
 		)
@@ -710,7 +726,7 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "destroy":
 		shellCmd := fmt.Sprintf(
-			"terraform init -input=false -backend-config=%s && terraform destroy -auto-approve -input=false -var-file=%s",
+			"terraform init -reconfigure -input=false -backend-config=%s && terraform destroy -auto-approve -input=false -var-file=%s",
 			backendPathArg,
 			shellQuote(varfile),
 		)
@@ -1060,8 +1076,59 @@ func dockerReplsetPorts(rs ReplsetConfig) []int {
 	return ports
 }
 
-func validateDockerPortConflicts(cfg Config) error {
-	portUsers := make(map[int][]string)
+func dockerOccupiedServicePorts(state map[string]*Environment, excludeEnvID string) map[int]struct{} {
+	occupied := make(map[int]struct{})
+	for envID, env := range state {
+		if envID == excludeEnvID || env == nil || env.Platform != "docker" || env.Status != "running" {
+			continue
+		}
+		for _, svc := range env.Config.PmmServers {
+			port := svc.PmmExternalPort
+			if port == 0 {
+				port = svc.PmmPort
+			}
+			if port > 0 {
+				occupied[port] = struct{}{}
+			}
+		}
+		for _, svc := range env.Config.MinioServers {
+			if svc.MinioPort > 0 {
+				occupied[svc.MinioPort] = struct{}{}
+			}
+			if svc.MinioConsolePort > 0 {
+				occupied[svc.MinioConsolePort] = struct{}{}
+			}
+		}
+	}
+	return occupied
+}
+
+func nextFreeDockerPort(start int, occupied map[int]struct{}) int {
+	port := start
+	for {
+		if _, exists := occupied[port]; !exists {
+			return port
+		}
+		port++
+	}
+}
+
+func nextFreeDockerPortPair(start int, occupied map[int]struct{}) (int, int) {
+	port := start
+	for {
+		if _, exists := occupied[port]; exists {
+			port++
+			continue
+		}
+		if _, exists := occupied[port+1]; exists {
+			port++
+			continue
+		}
+		return port, port + 1
+	}
+}
+
+func addDockerConfigPortUsers(cfg Config, portUsers map[int][]string, labelPrefix string) {
 	addPortUser := func(port int, user string) {
 		if port <= 0 {
 			return
@@ -1071,7 +1138,7 @@ func validateDockerPortConflicts(cfg Config) error {
 
 	for _, nr := range sortedReplsets(cfg.Replsets) {
 		for _, port := range dockerReplsetPorts(nr.Config) {
-			addPortUser(port, fmt.Sprintf("replica set %s", nr.Name))
+			addPortUser(port, fmt.Sprintf("%sreplica set", labelPrefix))
 		}
 	}
 	for _, ns := range sortedPmmServers(cfg.PmmServers) {
@@ -1079,14 +1146,26 @@ func validateDockerPortConflicts(cfg Config) error {
 		if port == 0 {
 			port = ns.Config.PmmPort
 		}
-		addPortUser(port, fmt.Sprintf("PMM server %s", ns.Name))
+		addPortUser(port, fmt.Sprintf("%sPMM server", labelPrefix))
 	}
 	for _, ns := range sortedMinioServers(cfg.MinioServers) {
-		addPortUser(ns.Config.MinioPort, fmt.Sprintf("MinIO API %s", ns.Name))
-		addPortUser(ns.Config.MinioConsolePort, fmt.Sprintf("MinIO console %s", ns.Name))
+		addPortUser(ns.Config.MinioPort, fmt.Sprintf("%sMinIO API", labelPrefix))
+		addPortUser(ns.Config.MinioConsolePort, fmt.Sprintf("%sMinIO console", labelPrefix))
 	}
 	for _, ns := range sortedLdapServers(cfg.LdapServers) {
-		addPortUser(ns.Config.LdapPort, fmt.Sprintf("LDAP server %s", ns.Name))
+		addPortUser(ns.Config.LdapPort, fmt.Sprintf("%sLDAP server", labelPrefix))
+	}
+}
+
+func validateDockerPortConflicts(envID string, cfg Config, state map[string]*Environment) error {
+	portUsers := make(map[int][]string)
+	addDockerConfigPortUsers(cfg, portUsers, "this environment ")
+
+	for otherEnvID, env := range state {
+		if otherEnvID == envID || env == nil || env.Platform != "docker" || env.Status != "running" {
+			continue
+		}
+		addDockerConfigPortUsers(env.Config, portUsers, fmt.Sprintf("environment %s ", otherEnvID))
 	}
 
 	var conflicts []string
@@ -1101,5 +1180,5 @@ func validateDockerPortConflicts(cfg Config) error {
 		return nil
 	}
 	sort.Strings(conflicts)
-	return fmt.Errorf("docker port conflicts detected: %s", strings.Join(conflicts, "; "))
+	return fmt.Errorf("docker port conflicts detected:\n- %s", strings.Join(conflicts, "\n- "))
 }

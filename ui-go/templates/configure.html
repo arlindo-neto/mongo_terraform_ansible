@@ -447,13 +447,13 @@
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="cluster_enable_pmm[]" value="1"
                             {{if .Config.EnablePmm}}checked{{end}}
-                            onchange="toggleImageGroup(this,'pmm'); if (this.checked) ensureDockerPmmServer()">
+                            onchange="onDockerPmmFeatureToggle(this)">
                 Enable PMM monitoring</label>
             </div>
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="cluster_enable_pbm[]" value="1"
                             {{if .Config.EnablePbm}}checked{{end}}
-                            onchange="toggleImageGroup(this,'pbm'); if (this.checked) ensureDockerMinioServer()">
+                            onchange="onDockerPbmFeatureToggle(this)">
                 Enable PBM backups</label>
             </div>
             <div class="form-group form-group-checkbox">
@@ -732,13 +732,13 @@
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="replset_enable_pmm[]" value="1"
                             {{if .Config.EnablePmm}}checked{{end}}
-                            onchange="toggleImageGroup(this,'pmm'); if (this.checked) ensureDockerPmmServer()">
+                            onchange="onDockerPmmFeatureToggle(this)">
                 Enable PMM monitoring</label>
             </div>
             <div class="form-group form-group-checkbox">
               <label><input type="checkbox" name="replset_enable_pbm[]" value="1"
                             {{if .Config.EnablePbm}}checked{{end}}
-                            onchange="toggleImageGroup(this,'pbm'); if (this.checked) ensureDockerMinioServer()">
+                            onchange="onDockerPbmFeatureToggle(this)">
                 Enable PBM backups</label>
             </div>
             <div class="form-group form-group-checkbox">
@@ -897,7 +897,7 @@
       <label class="toggle-label">
         <input type="checkbox" id="enable-pmm-docker"
                {{if .SortedPmmServers}}checked{{end}}
-               onchange="toggleDockerSingleServer('pmm-servers-container', this, addPmmServer)">
+               onchange="toggleDockerSingleServer('pmm-servers-container', this, addPmmServer); syncDockerPmmDependencies(this.checked)">
         Include PMM Server
       </label>
     </div>
@@ -928,7 +928,7 @@
             </div>
             <div class="form-group">
               <label>PMM Port <span class="field-tip" data-tip="Host port exposed for the PMM Server HTTPS interface (default: 8443).">ⓘ</span></label>
-              <input type="number" name="pmm_server_port[]" value="{{if .Config.PmmExternalPort}}{{.Config.PmmExternalPort}}{{else}}{{intDefault .Config.PmmPort 8443}}{{end}}" placeholder="8443">
+              <input type="number" name="pmm_server_port[]" value="{{if .Config.PmmExternalPort}}{{.Config.PmmExternalPort}}{{else}}{{$.DockerDefaultPmmExternalPort}}{{end}}" placeholder="8443">
             </div>
           </div>
           <div class="form-row">
@@ -1155,7 +1155,7 @@
       <label class="toggle-label">
         <input type="checkbox" id="enable-minio-docker"
                {{if .SortedMinio}}checked{{end}}
-               onchange="toggleDockerSingleServer('minio-servers-container', this, addMinioServer); toggleCredentialRow('cred-minio-row', this.checked)">
+               onchange="toggleDockerSingleServer('minio-servers-container', this, addMinioServer); toggleCredentialRow('cred-minio-row', this.checked); syncDockerMinioDependencies(this.checked)">
         Include Minio Server
       </label>
     </div>
@@ -1179,11 +1179,11 @@
             </div>
             <div class="form-group">
               <label>API Port <span class="field-tip" data-tip="Host port for the Minio S3 API (default: 9000).">ⓘ</span></label>
-              <input type="number" name="minio_port[]" value="{{intDefault .Config.MinioPort 9000}}">
+              <input type="number" name="minio_port[]" value="{{if .Config.MinioPort}}{{.Config.MinioPort}}{{else}}{{$.DockerDefaultMinioPort}}{{end}}">
             </div>
             <div class="form-group">
               <label>Console Port <span class="field-tip" data-tip="Host port for the Minio web console (default: 9001).">ⓘ</span></label>
-              <input type="number" name="minio_console_port[]" value="{{intDefault .Config.MinioConsolePort 9001}}">
+              <input type="number" name="minio_console_port[]" value="{{if .Config.MinioConsolePort}}{{.Config.MinioConsolePort}}{{else}}{{$.DockerDefaultMinioConsolePort}}{{end}}">
             </div>
           </div>
           <div class="form-row">
@@ -1394,6 +1394,9 @@ function stepNumber(btn, delta) {
 }
 
 const PLATFORM        = {{json .Platform}};
+const DOCKER_DEFAULT_PMM_EXTERNAL_PORT = {{.DockerDefaultPmmExternalPort}};
+const DOCKER_DEFAULT_MINIO_PORT = {{.DockerDefaultMinioPort}};
+const DOCKER_DEFAULT_MINIO_CONSOLE_PORT = {{.DockerDefaultMinioConsolePort}};
 const PSMDB_IMAGES    = {{json .PSMDBImages}};
 const PBM_IMAGES      = {{json .PBMImages}};
 const PMM_CLIENT_IMAGES = {{json .PMMClientImages}};
@@ -1480,6 +1483,68 @@ function ensureDockerPmmServer() {
 function ensureDockerMinioServer() {
   if (PLATFORM !== 'docker') return;
   ensureDockerSingleServerSelected('enable-minio-docker', 'minio-servers-container', addMinioServer, 'cred-minio-row');
+}
+
+function setDockerMonitoringCheckboxes(name, checked, imageGroup) {
+  if (PLATFORM !== 'docker') return;
+  document.querySelectorAll(`input[name="${name}[]"]`).forEach(cb => {
+    if (cb.checked === checked) return;
+    cb.checked = checked;
+    toggleImageGroup(cb, imageGroup);
+  });
+}
+
+function syncDockerPmmDependencies(checked) {
+  setDockerMonitoringCheckboxes('cluster_enable_pmm', checked, 'pmm');
+  setDockerMonitoringCheckboxes('replset_enable_pmm', checked, 'pmm');
+}
+
+function syncDockerMinioDependencies(checked) {
+  setDockerMonitoringCheckboxes('cluster_enable_pbm', checked, 'pbm');
+  setDockerMonitoringCheckboxes('replset_enable_pbm', checked, 'pbm');
+}
+
+function syncDockerServiceToggleFromDependencies(toggleId, containerId, addFn, dependencyNames, credRowId = '') {
+  if (PLATFORM !== 'docker') return;
+  const toggle = document.getElementById(toggleId);
+  if (!toggle) return;
+  const enabled = dependencyNames.some(name =>
+    Array.from(document.querySelectorAll(`input[name="${name}[]"]`)).some(cb => cb.checked)
+  );
+  toggle.checked = enabled;
+  toggleDockerSingleServer(containerId, toggle, addFn);
+  if (credRowId) toggleCredentialRow(credRowId, enabled);
+}
+
+function syncDockerPmmServerToggle() {
+  syncDockerServiceToggleFromDependencies(
+    'enable-pmm-docker',
+    'pmm-servers-container',
+    addPmmServer,
+    ['cluster_enable_pmm', 'replset_enable_pmm'],
+  );
+}
+
+function syncDockerMinioServerToggle() {
+  syncDockerServiceToggleFromDependencies(
+    'enable-minio-docker',
+    'minio-servers-container',
+    addMinioServer,
+    ['cluster_enable_pbm', 'replset_enable_pbm'],
+    'cred-minio-row',
+  );
+}
+
+function onDockerPmmFeatureToggle(checkbox) {
+  toggleImageGroup(checkbox, 'pmm');
+  if (checkbox.checked) ensureDockerPmmServer();
+  syncDockerPmmServerToggle();
+}
+
+function onDockerPbmFeatureToggle(checkbox) {
+  toggleImageGroup(checkbox, 'pbm');
+  if (checkbox.checked) ensureDockerMinioServer();
+  syncDockerMinioServerToggle();
 }
 
 // Show or hide a credential row inside the Credentials section based on whether
@@ -1706,10 +1771,10 @@ function buildDockerImageRows(type) {
     <div class="form-row">
       <div class="form-group form-group-checkbox">
           <label><input type="checkbox" name="${type}_enable_pmm[]" value="1"
-          onchange="toggleImageGroup(this,'pmm'); if (this.checked) ensureDockerPmmServer()"> Enable PMM monitoring</label></div>
+          onchange="onDockerPmmFeatureToggle(this)"> Enable PMM monitoring</label></div>
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" name="${type}_enable_pbm[]" value="1"
-          onchange="toggleImageGroup(this,'pbm'); if (this.checked) ensureDockerMinioServer()"> Enable PBM backups</label></div>
+          onchange="onDockerPbmFeatureToggle(this)"> Enable PBM backups</label></div>
       <div class="form-group form-group-checkbox">
         <label><input type="checkbox" name="${type}_bind_to_localhost[]" value="1"> Bind ports to localhost only</label></div>
     </div>
@@ -1934,6 +1999,8 @@ function addCluster() {
       ${dockerRows}${computeRows}
     </div>`;
   document.getElementById('clusters-container').appendChild(c);
+  syncDockerPmmDependencies(document.getElementById('enable-pmm-docker')?.checked);
+  syncDockerMinioDependencies(document.getElementById('enable-minio-docker')?.checked);
 }
 
 function addReplset() {
@@ -1968,6 +2035,8 @@ function addReplset() {
       ${dockerRows}${computeRows}
     </div>`;
   document.getElementById('replsets-container').appendChild(c);
+  syncDockerPmmDependencies(document.getElementById('enable-pmm-docker')?.checked);
+  syncDockerMinioDependencies(document.getElementById('enable-minio-docker')?.checked);
 }
 
 function addPmmServer() {
@@ -1992,7 +2061,7 @@ function addPmmServer() {
             ${PMM_SERVER_IMAGES.map(t => `<option value="${escHtml(t)}"${t === 'latest' ? ' selected' : ''}>percona/pmm-server:${escHtml(t)}</option>`).join('')}
           </select></div>
         <div class="form-group"><label>PMM Port <span class="field-tip" data-tip="Host port exposed for the PMM Server HTTPS interface (default: 8443).">ⓘ</span></label>
-          <input type="number" name="pmm_server_port[]" value="8443"></div>
+          <input type="number" name="pmm_server_port[]" value="${DOCKER_DEFAULT_PMM_EXTERNAL_PORT}"></div>
       </div>
       <div class="form-row">
         <div class="form-group form-group-checkbox">
@@ -2022,9 +2091,9 @@ function addMinioServer() {
         <div class="form-group"><label>Minio Image <span class="field-tip" data-tip="Minio Docker image to use.">ⓘ</span></label>
           <input type="text" name="minio_image[]" value="minio/minio:latest"></div>
         <div class="form-group"><label>API Port <span class="field-tip" data-tip="Host port for the Minio S3 API (default: 9000).">ⓘ</span></label>
-          <input type="number" name="minio_port[]" value="9000"></div>
+          <input type="number" name="minio_port[]" value="${DOCKER_DEFAULT_MINIO_PORT}"></div>
         <div class="form-group"><label>Console Port <span class="field-tip" data-tip="Host port for the Minio web console (default: 9001).">ⓘ</span></label>
-          <input type="number" name="minio_console_port[]" value="9001"></div>
+          <input type="number" name="minio_console_port[]" value="${DOCKER_DEFAULT_MINIO_CONSOLE_PORT}"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Bucket Name <span class="field-tip" data-tip="Default S3 bucket name for MongoDB backups.">ⓘ</span></label>
@@ -2331,6 +2400,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const mongoRelSel = document.getElementById('mongo_release');
   if (mongoRelSel) onMongoReleaseChange(mongoRelSel);
 
+  if (PLATFORM === 'docker') {
+    syncDockerPmmDependencies(document.getElementById('enable-pmm-docker')?.checked);
+    syncDockerMinioDependencies(document.getElementById('enable-minio-docker')?.checked);
+    syncDockerPmmServerToggle();
+    syncDockerMinioServerToggle();
+  }
+
   // Async version refresh — updates global JS constants and repopulates selects.
   fetch('/api/versions')
     .then(r => r.json())
@@ -2624,7 +2700,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
       config.pmm_servers[name] = {
         env_tag: 'test',
         pmm_server_image: `percona/pmm-server:${pImages[i] || 'latest'}`,
-        pmm_port: parseInt(pPorts[i]) || 8443,
+        pmm_port: 8443,
         pmm_external_port: parseInt(pPorts[i]) || 8443,
         // pmm_server_user/pwd not set here – they use the Terraform defaults
         bind_to_localhost: pBind.some((v,idx) => idx === i && v === '1'),

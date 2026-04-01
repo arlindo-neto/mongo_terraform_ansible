@@ -52,9 +52,8 @@
         <td class="env-actions-cell" onclick="event.stopPropagation()">
           {{if ne .Env.Status "deleted"}}
           <a href="/environment/{{.ID}}" class="btn btn-secondary btn-sm">Manage</a>
-          <a href="/configure/{{.Env.Platform}}?env_id={{.ID}}" class="btn btn-outline btn-sm">Edit</a>
           {{end}}
-          <button class="btn btn-outline btn-sm btn-danger-outline" onclick="deleteEnvironment('{{.ID}}', '{{.Env.Status}}', '{{.Env.Platform}}')">Remove</button>
+          <button class="btn btn-outline btn-sm btn-danger-outline" title="Remove environment" aria-label="Remove environment {{.ID}}" onclick="deleteEnvironment('{{.ID}}', '{{.Env.Status}}', '{{.Env.Platform}}')">X</button>
         </td>
       </tr>
       {{end}}

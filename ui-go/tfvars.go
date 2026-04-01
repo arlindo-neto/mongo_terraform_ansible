@@ -375,12 +375,16 @@ func writeTfvars(envID, platform string, cfg Config) error {
 				if s.PmmServerImage != "" {
 					write(fmt.Sprintf("    pmm_server_image = %s", formatHCLVal(s.PmmServerImage)))
 				}
-				if s.PmmPort != 0 {
-					write(fmt.Sprintf("    pmm_port = %s", formatHCLVal(s.PmmPort)))
+				internalPort := s.PmmPort
+				if internalPort == 0 {
+					internalPort = 8443
+				}
+				if internalPort != 0 {
+					write(fmt.Sprintf("    pmm_port = %s", formatHCLVal(internalPort)))
 				}
 				externalPort := s.PmmExternalPort
 				if externalPort == 0 {
-					externalPort = s.PmmPort
+					externalPort = internalPort
 				}
 				if externalPort != 0 {
 					write(fmt.Sprintf("    pmm_external_port = %s", formatHCLVal(externalPort)))

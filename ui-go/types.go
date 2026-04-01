@@ -304,11 +304,14 @@ type NewEnvData struct {
 }
 
 type ConfigureData struct {
-	Platform      string
-	EnvID         string
-	Config        Config
-	OSUser        string // current OS user, used as SSH user default
-	PSMDBVersions []string
+	Platform                      string
+	EnvID                         string
+	Config                        Config
+	OSUser                        string // current OS user, used as SSH user default
+	DockerDefaultPmmExternalPort  int
+	DockerDefaultMinioPort        int
+	DockerDefaultMinioConsolePort int
+	PSMDBVersions                 []string
 	// PBMVersions holds a flat sorted-descending list of all available PBM package
 	// versions (e.g. ["2.7.0", "2.6.1", "2.6.0", ...]). PBM uses a single Percona
 	// repository so there is no per-major-version grouping.

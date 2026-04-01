@@ -731,18 +731,13 @@ async function executeAction(action) {
       appendToTerminal(`\n✔ Job finished: ${s}`);
       es.close(); activeEventSource = null; setButtonsDisabled(false);
       hideProgressIndicator();
-      if (action === 'destroy' && s === 'success') {
-        appendToTerminal('Environment destroyed. Redirecting to home…');
-        setTimeout(() => { window.location.href = '/'; }, 2000);
-      } else {
-        if (action === 'destroy') {
-          appendToTerminal('⚠ Destroy failed – environment has been retained. Check the output above and retry.');
-        }
-        // Refresh the status bar from the server so it reflects the
-        // final persisted state (e.g. reset_success, stop_failed, …).
-        refreshEnvStatus();
-        loadHosts();
+      if (action === 'destroy' && s !== 'success') {
+        appendToTerminal('⚠ Destroy failed – environment has been retained. Check the output above and retry.');
       }
+      // Refresh the status bar from the server so it reflects the
+      // final persisted state (e.g. deleted, reset_success, stop_failed, …).
+      refreshEnvStatus();
+      loadHosts();
     });
     es.onerror = () => {
       appendToTerminal('\n⚠ Stream connection lost.');
