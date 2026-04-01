@@ -3,8 +3,9 @@ data "docker_registry_image" "vault" {
 }
 
 resource "docker_image" "vault" {
-  name = var.vault_image
+  name          = var.vault_image
   pull_triggers = [data.docker_registry_image.vault.sha256_digest]
+  keep_locally  = true
 }
 
 resource "docker_volume" "vault_data" {
