@@ -661,14 +661,15 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 	// the platform directory so different environments do not share state and
 	// can be operated concurrently.
 	envStateFile := envID + ".tfstate" // relative to tfDir (the CWD for terraform)
+	backendPathArg := shellQuote("path=" + envStateFile)
 
 	var cmd []string
 	switch action {
 	case "deploy":
 		shellCmd := fmt.Sprintf(
-			"terraform init -input=false && terraform apply -auto-approve -input=false -var-file=%s -state=%s",
+			"terraform init -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
+			backendPathArg,
 			shellQuote(varfile),
-			shellQuote(envStateFile),
 		)
 		if platform != "docker" {
 			shellCmd += sshConfigInjectShell()
@@ -682,9 +683,9 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		shellCmd := fmt.Sprintf(
-			"terraform init -input=false && terraform apply -auto-approve -input=false -var-file=%s -state=%s",
+			"terraform init -input=false -backend-config=%s && terraform apply -auto-approve -input=false -var-file=%s",
+			backendPathArg,
 			shellQuote(varfile),
-			shellQuote(envStateFile),
 		)
 		shellCmd += sshConfigInjectShell()
 		cmd = []string{"bash", "-c", shellCmd}
@@ -709,9 +710,9 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "destroy":
 		shellCmd := fmt.Sprintf(
-			"terraform destroy -auto-approve -input=false -var-file=%s -state=%s",
+			"terraform init -input=false -backend-config=%s && terraform destroy -auto-approve -input=false -var-file=%s",
+			backendPathArg,
 			shellQuote(varfile),
-			shellQuote(envStateFile),
 		)
 		if platform != "docker" {
 			shellCmd += sshConfigRemoveShell()
