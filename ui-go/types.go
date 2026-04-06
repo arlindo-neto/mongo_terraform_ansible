@@ -24,6 +24,8 @@ type ClusterConfig struct {
 	EnablePmm       bool   `json:"enable_pmm,omitempty"`
 	EnablePbm       bool   `json:"enable_pbm,omitempty"`
 	BindToLocalhost bool   `json:"bind_to_localhost,omitempty"`
+	EnableAudit     *bool  `json:"enable_audit,omitempty"`
+	AuditFilter     string `json:"audit_filter,omitempty"`
 }
 
 // ReplsetConfig maps to the Terraform "replsets" map object type.
@@ -42,6 +44,8 @@ type ReplsetConfig struct {
 	EnablePmm       bool   `json:"enable_pmm,omitempty"`
 	EnablePbm       bool   `json:"enable_pbm,omitempty"`
 	BindToLocalhost bool   `json:"bind_to_localhost,omitempty"`
+	EnableAudit     *bool  `json:"enable_audit,omitempty"`
+	AuditFilter     string `json:"audit_filter,omitempty"`
 }
 
 // PmmServerConfig maps to the Docker pmm_servers map object type.
@@ -308,6 +312,7 @@ type ConfigureData struct {
 	Platform                      string
 	EnvID                         string
 	Config                        Config
+	DefaultAuditFilter            string
 	OSUser                        string // current OS user, used as SSH user default
 	DockerDefaultPmmExternalPort  int
 	DockerDefaultMinioPort        int

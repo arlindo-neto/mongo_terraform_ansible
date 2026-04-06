@@ -41,6 +41,8 @@ var defaultPMMClientImages = []string{
 	"3.3.0", "3.2.0", "3.1.0", "3.0.0", "2.43.2", "2.43.1", "latest",
 }
 
+const defaultAuditFilter = `{ atype: "authCheck", "param.command": { $in: [ "insert", "update", "delete", "findandmodify" ] }, "users.user": { $not: /^__/ } }`
+
 // ─── Globals ──────────────────────────────────────────────────────────────────
 
 var (
@@ -86,12 +88,7 @@ var funcMap = template.FuncMap{
 		return *n
 	},
 	// Return *b if non-nil, otherwise def.
-	"boolDefault": func(b *bool, def bool) bool {
-		if b == nil {
-			return def
-		}
-		return *b
-	},
+	"boolDefault": boolDefault,
 	// Return true when b is explicitly set to false.
 	"ptrBoolFalse": func(b *bool) bool {
 		return b != nil && !*b
@@ -252,6 +249,13 @@ func intPtrDefault(n *int, def int) int {
 		return def
 	}
 	return *n
+}
+
+func boolDefault(b *bool, def bool) bool {
+	if b == nil {
+		return def
+	}
+	return *b
 }
 
 // ─── ANSI stripping ───────────────────────────────────────────────────────────

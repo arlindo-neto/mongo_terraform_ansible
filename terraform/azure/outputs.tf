@@ -24,9 +24,11 @@ resource "local_file" "AnsibleInventoryCluster" {
       number_of_shards     = each.value.number_of_shards
       arbiters_per_replset = range(each.value.arbiters_per_replset)
 
-      my_ssh_user = var.my_ssh_user
-      cluster     = each.value.cluster
-      env_tag     = each.value.env_tag
+      my_ssh_user  = var.my_ssh_user
+      cluster      = each.value.cluster
+      env_tag      = each.value.env_tag
+      enable_audit = each.value.enable_audit
+      audit_filter = each.value.audit_filter
 
       location           = each.value.location
       hostname_pmm       = var.enable_pmm ? local.pmm_host : ""
@@ -89,6 +91,8 @@ resource "local_file" "AnsibleInventoryRS" {
       my_ssh_user        = var.my_ssh_user
       rs_name            = each.value.rs_name
       env_tag            = each.value.env_tag
+      enable_audit       = each.value.enable_audit
+      audit_filter       = each.value.audit_filter
       location           = each.value.location
       hostname_pmm       = var.enable_pmm ? local.pmm_host : ""
       ip_pmm             = var.enable_pmm ? azurerm_linux_virtual_machine.pmm[0].public_ip_address : ""

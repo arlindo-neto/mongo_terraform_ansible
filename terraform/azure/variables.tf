@@ -22,6 +22,8 @@ variable "clusters" {
     arbiters_per_replset = optional(number, 1)
     mongos_count         = optional(number, 2)
     bind_to_localhost    = optional(bool, false)
+    enable_audit         = optional(bool, false)
+    audit_filter         = optional(string, "")
   }))
   default = {
     ig-cl01 = {
@@ -37,6 +39,8 @@ variable "replsets" {
     data_nodes_per_replset = optional(number, 2)
     arbiters_per_replset   = optional(number, 1)
     bind_to_localhost      = optional(bool, false)
+    enable_audit           = optional(bool, false)
+    audit_filter           = optional(string, "")
   }))
   default = {
     #     ig-rs01 = {

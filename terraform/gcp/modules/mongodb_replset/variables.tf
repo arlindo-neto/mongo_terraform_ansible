@@ -3,18 +3,18 @@
 ################
 
 variable "prefix" {
-  type    = string
-  default = "ig"
+  type        = string
+  default     = "ig"
   description = "Prefix to be applied to the resources created, make sure to change it to avoid collisions with other users projects"
 }
 
 variable "rs_name" {
   description = "Name of the MongoDB cluster"
-  default = "rs01"
+  default     = "rs01"
 }
 
 variable "env_tag" {
-  default = "qa"
+  default     = "qa"
   description = "Name of Environment"
 }
 
@@ -22,13 +22,13 @@ variable "gce_ssh_users" {
   description = "SSH user names, and the path to public key files on your machine to be added to authorized_keys"
   default = {
     ivan_groenewold = "ivan.pub"
-#    ,user2 = "user2.pub"
+    #    ,user2 = "user2.pub"
   }
 }
 
 variable "my_ssh_user" {
-  default = "ivan_groenewold"
-  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"  
+  default     = "ivan_groenewold"
+  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"
 }
 
 ##################
@@ -36,13 +36,25 @@ variable "my_ssh_user" {
 ##################
 
 variable "data_nodes_per_replset" {
-  default = "2"
+  default     = "2"
   description = "How many data bearing nodes per replset"
 }
 
 variable "arbiters_per_replset" {
-  default = "1"
+  default     = "1"
   description = "Number of arbiters per replica set"
+}
+
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = ""
+  description = "Optional audit filter override passed to Ansible inventory"
 }
 
 ######################
@@ -51,21 +63,21 @@ variable "arbiters_per_replset" {
 
 variable "replset_tag" {
   description = "Name of the replicaset servers"
-  default = "mongodb-svr"
+  default     = "mongodb-svr"
 }
 
 variable "replsetsvr_port" {
-  type = number
+  type    = number
   default = 27017
 }
 
 variable "replsetsvr_volume_size" {
-  default = "100"
+  default     = "100"
   description = "storage size for the replica set servers"
 }
 
 variable "replsetsvr_type" {
-  default = "e2-medium"
+  default     = "e2-medium"
   description = "instance type of the replica set servers"
 }
 
@@ -75,16 +87,16 @@ variable "replsetsvr_type" {
 
 variable "arbiter_tag" {
   description = "Name of the arbiter servers"
-  default = "mongodb-arb"
+  default     = "mongodb-arb"
 }
 
 variable "arbiter_type" {
-  default = "e2-medium"
+  default     = "e2-medium"
   description = "instance type of the arbiter server"
 }
 
 variable "arbiter_port" {
-  type = number
+  type    = number
   default = 27017
 }
 
@@ -100,7 +112,7 @@ variable "image" {
 
 # Save money by running spot instances but they may be terminated by google at any time
 variable "use_spot_instances" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -123,7 +135,7 @@ variable "vpc" {
 }
 
 variable "subnet_name" {
-  type = string
+  type    = string
   default = "mongo-subnet"
 }
 

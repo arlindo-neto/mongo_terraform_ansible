@@ -28,6 +28,8 @@ module "mongodb_clusters" {
   shardsvr_replicas     = each.value.shardsvr_replicas
   arbiters_per_replset  = each.value.arbiters_per_replset
   mongos_count          = each.value.mongos_count
+  enable_audit          = each.value.enable_audit
+  audit_filter          = each.value.audit_filter
   vpc                   = local.vpc
   subnet_name           = var.subnet_name
   region                = var.region
@@ -55,6 +57,8 @@ module "mongodb_replsets" {
   env_tag                = each.value.env_tag
   data_nodes_per_replset = each.value.data_nodes_per_replset
   arbiters_per_replset   = each.value.arbiters_per_replset
+  enable_audit           = each.value.enable_audit
+  audit_filter           = each.value.audit_filter
   vpc                    = local.vpc
   subnet_name            = var.subnet_name
   region                 = var.region

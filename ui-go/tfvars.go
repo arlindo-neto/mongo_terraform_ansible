@@ -299,6 +299,10 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write(fmt.Sprintf("    shardsvr_replicas = %s", formatHCLVal(intDefault(c.ShardsvrReplicas, 2))))
 			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intPtrDefault(c.ArbitersPerReplset, 1))))
 			write(fmt.Sprintf("    mongos_count = %s", formatHCLVal(intDefault(c.MongosCount, 2))))
+			write(fmt.Sprintf("    enable_audit = %s", formatHCLVal(boolDefault(c.EnableAudit, false))))
+			if strings.TrimSpace(c.AuditFilter) != "" {
+				write(fmt.Sprintf("    audit_filter = %s", formatHCLVal(c.AuditFilter)))
+			}
 			if platform == "docker" {
 				if c.PsmdbImage != "" {
 					write(fmt.Sprintf("    psmdb_image = %s", formatHCLVal(c.PsmdbImage)))
@@ -334,6 +338,10 @@ func writeTfvars(envID, platform string, cfg Config) error {
 			write(fmt.Sprintf("    env_tag = %s", formatHCLVal(strDefault(r.EnvTag, "test"))))
 			write(fmt.Sprintf("    data_nodes_per_replset = %s", formatHCLVal(intDefault(r.DataNodesPerReplset, 2))))
 			write(fmt.Sprintf("    arbiters_per_replset = %s", formatHCLVal(intPtrDefault(r.ArbitersPerReplset, 1))))
+			write(fmt.Sprintf("    enable_audit = %s", formatHCLVal(boolDefault(r.EnableAudit, false))))
+			if strings.TrimSpace(r.AuditFilter) != "" {
+				write(fmt.Sprintf("    audit_filter = %s", formatHCLVal(r.AuditFilter)))
+			}
 			if platform == "docker" {
 				if r.ReplsetPort != 0 {
 					write(fmt.Sprintf("    replset_port = %s", formatHCLVal(r.ReplsetPort)))

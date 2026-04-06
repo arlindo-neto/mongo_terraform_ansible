@@ -3,24 +3,24 @@
 ################
 
 variable "prefix" {
-  type    = string
-  default = "ig"
+  type        = string
+  default     = "ig"
   description = "Prefix to be applied to the resources created, make sure to change it to avoid collisions with other users projects"
 }
 
 variable "cluster_name" {
   description = "Name of the MongoDB cluster"
-  default = "cluster01"
+  default     = "cluster01"
 }
 
 variable "env_tag" {
-  default = "qa"
+  default     = "qa"
   description = "Name of Environment"
 }
 
 variable "my_ssh_user" {
-  default = "ec2-user"
-  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"  
+  default     = "ec2-user"
+  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"
 }
 
 variable "my_key_pair" {
@@ -34,28 +34,40 @@ variable "my_key_pair" {
 ##################
 
 variable "configsvr_count" {
-  default = "3"
+  default     = "3"
   description = "Number of config servers to be used"
 }
 
 variable "shard_count" {
-  default = "2"
+  default     = "2"
   description = "Number of shards to be used"
 }
 
 variable "shardsvr_replicas" {
-  default = "2"
+  default     = "2"
   description = "How many data bearing nodes per shard"
 }
 
 variable "arbiters_per_replset" {
-  default = "1"
+  default     = "1"
   description = "Number of arbiters per replica set"
 }
 
 variable "mongos_count" {
-  default = "1"
+  default     = "1"
   description = "Number of mongos to provision"
+}
+
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = ""
+  description = "Optional audit filter override passed to Ansible inventory"
 }
 
 ################
@@ -64,22 +76,22 @@ variable "mongos_count" {
 
 variable "shardsvr_tag" {
   description = "Name of the shard servers"
-  default = "mongodb-shard"
+  default     = "mongodb-shard"
 }
 
 variable "shardsvr_type" {
-  default = "t3.medium"
+  default     = "t3.medium"
   description = "instance type of the shard server"
 }
 
 variable "shardsvr_volume_size" {
-  default = "50"
+  default     = "50"
   description = "storage size for the shard server"
 }
 
 variable "shardsvr_ports" {
-  type = list(number)
-  default = [ 22, 27018 ]
+  type    = list(number)
+  default = [22, 27018]
 }
 
 ################
@@ -88,22 +100,22 @@ variable "shardsvr_ports" {
 
 variable "configsvr_tag" {
   description = "Name of the config servers"
-  default = "mongodb-cfg"
+  default     = "mongodb-cfg"
 }
 
 variable "configsvr_type" {
-  default = "t3.medium"
+  default     = "t3.medium"
   description = "instance type of the config server"
 }
 
 variable "configsvr_volume_size" {
-  default = "20"
+  default     = "20"
   description = "storage size for the config server"
 }
 
 variable "configsvr_ports" {
-  type = list(number)
-  default = [ 22, 27019 ]
+  type    = list(number)
+  default = [22, 27019]
 }
 
 ################
@@ -112,17 +124,17 @@ variable "configsvr_ports" {
 
 variable "mongos_tag" {
   description = "Name of the mongos router servers"
-  default = "mongodb-mongos"
+  default     = "mongodb-mongos"
 }
 
 variable "mongos_type" {
-  default = "t3.medium"
+  default     = "t3.medium"
   description = "instance type of the mongos servers"
 }
 
 variable "mongos_ports" {
-  type = list(number)
-  default = [ 22, 27017 ]
+  type    = list(number)
+  default = [22, 27017]
 }
 
 #############
@@ -131,17 +143,17 @@ variable "mongos_ports" {
 
 variable "arbiter_tag" {
   description = "Name of the arbiter servers"
-  default = "mongodb-arb"
+  default     = "mongodb-arb"
 }
 
 variable "arbiter_type" {
-  default = "t3.medium"
+  default     = "t3.medium"
   description = "instance type of the arbiter server"
 }
 
 variable "arbiter_ports" {
-  type = list(number)
-  default = [ 22, 27018 ]
+  type    = list(number)
+  default = [22, 27018]
 }
 
 #############
@@ -157,7 +169,7 @@ variable "image" {
 
 # Save money by running spot instances but they may be terminated by AWS at any time
 variable "use_spot_instances" {
-  type = bool
+  type    = bool
   default = false
 }
 
@@ -180,8 +192,8 @@ variable "vpc" {
 }
 
 variable "subnet_count" {
-  type = number
-  default = 3
+  type        = number
+  default     = 3
   description = "How many subnets to use"
 }
 

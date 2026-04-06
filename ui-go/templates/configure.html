@@ -442,6 +442,20 @@
               </div>
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="cluster_enable_audit[]" value="1"
+                            {{if boolDefault .Config.EnableAudit false}}checked{{end}}
+                            onchange="toggleAuditFilter(this)">
+                Enable audit plugin <span class="field-tip" data-tip="Enables the PSMDB audit plugin for this cluster. By default it audits write operations for non-system users and writes JSON events to a file.">ⓘ</span></label>
+            </div>
+          </div>
+          <div class="form-row" data-audit-filter-row {{if not (boolDefault .Config.EnableAudit false)}}style="display:none"{{end}}>
+            <div class="form-group form-group-full">
+              <label>Audit Filter <span class="field-tip" data-tip="MongoDB audit filter expression. Leave the default to audit writes from non-system users only.">ⓘ</span></label>
+              <textarea name="cluster_audit_filter[]" rows="4" spellcheck="false">{{strDefault .Config.AuditFilter $.DefaultAuditFilter}}</textarea>
+            </div>
+          </div>
           {{if eq $p "docker"}}
             <div class="form-row">
             <div class="form-group form-group-checkbox">
@@ -726,6 +740,20 @@
                      title="Starting port for data nodes. Auto-assigned to avoid collisions.">
             </div>
             {{end}}
+          </div>
+          <div class="form-row">
+            <div class="form-group form-group-checkbox">
+              <label><input type="checkbox" name="replset_enable_audit[]" value="1"
+                            {{if boolDefault .Config.EnableAudit false}}checked{{end}}
+                            onchange="toggleAuditFilter(this)">
+                Enable audit plugin <span class="field-tip" data-tip="Enables the PSMDB audit plugin for this replica set. By default it audits write operations for non-system users and writes JSON events to a file.">ⓘ</span></label>
+            </div>
+          </div>
+          <div class="form-row" data-audit-filter-row {{if not (boolDefault .Config.EnableAudit false)}}style="display:none"{{end}}>
+            <div class="form-group form-group-full">
+              <label>Audit Filter <span class="field-tip" data-tip="MongoDB audit filter expression. Leave the default to audit writes from non-system users only.">ⓘ</span></label>
+              <textarea name="replset_audit_filter[]" rows="4" spellcheck="false">{{strDefault .Config.AuditFilter $.DefaultAuditFilter}}</textarea>
+            </div>
           </div>
           {{if eq $p "docker"}}
           <div class="form-row">
@@ -1452,6 +1480,7 @@ const PMM_CLIENT_IMAGES = {{json .PMMClientImages}};
 const PMM_SERVER_IMAGES = {{json .PMMImages}};
 const PSMDB_VERSIONS  = {{json .PSMDBVersions}};
 const PBM_VERSIONS    = {{json .PBMVersions}};
+const DEFAULT_AUDIT_FILTER = {{json .DefaultAuditFilter}};
 // Minor versions keyed by major release identifier, e.g. {"psmdb-70": ["7.0.12", ...]}
 // Declared as let so the async /api/versions refresh can update it in-place.
 let PSMDB_MINOR_VERSIONS = {{json .PSMDBMinorVersions}};
@@ -1699,6 +1728,14 @@ function toggleImageGroup(checkbox, group) {
   el.style.display = checkbox.checked ? '' : 'none';
 }
 
+function toggleAuditFilter(checkbox) {
+  const body = checkbox.closest('.customize-body');
+  if (!body) return;
+  const row = body.querySelector('[data-audit-filter-row]');
+  if (!row) return;
+  row.style.display = checkbox.checked ? '' : 'none';
+}
+
 // Toggle the per-block .customize-body panel (clusters, replsets, Docker servers).
 function toggleCustomizeBlock(btn) {
   const body = btn.closest('.component-block').querySelector('.customize-body');
@@ -1831,6 +1868,22 @@ function buildDockerImageRows(type) {
       ${makeImageGroup('PSMDB Image', 'Percona Server for MongoDB Docker image tag for nodes in this block.', 'psmdb_image[]', psmdbSel, null)}
       ${makeImageGroup('PBM Image', 'Percona Backup for MongoDB Docker image tag for backup agents.', 'pbm_image[]', pbmSel, 'pbm')}
       ${makeImageGroup('PMM Client Image', 'PMM Client Docker image tag for monitoring nodes.', 'pmm_client_image[]', pmmcSel, 'pmm')}
+    </div>`;
+}
+
+function buildAuditRows(type, enabled = false, filter = DEFAULT_AUDIT_FILTER) {
+  return `
+    <div class="form-row">
+      <div class="form-group form-group-checkbox">
+        <label><input type="checkbox" name="${type}_enable_audit[]" value="1"${enabled ? ' checked' : ''} onchange="toggleAuditFilter(this)">
+          Enable audit plugin <span class="field-tip" data-tip="Enables the PSMDB audit plugin for this deployment block. By default it audits write operations for non-system users and writes JSON events to a file.">ⓘ</span></label>
+      </div>
+    </div>
+    <div class="form-row" data-audit-filter-row${enabled ? '' : ' style="display:none"'}>
+      <div class="form-group form-group-full">
+        <label>Audit Filter <span class="field-tip" data-tip="MongoDB audit filter expression. Leave the default to audit writes from non-system users only.">ⓘ</span></label>
+        <textarea name="${type}_audit_filter[]" rows="4" spellcheck="false">${escHtml(filter || DEFAULT_AUDIT_FILTER)}</textarea>
+      </div>
     </div>`;
 }
 
@@ -2045,7 +2098,7 @@ function addCluster() {
         <div class="form-group"><label>Replicas / Shard <span class="field-tip" data-tip="Number of data-bearing replica set members per shard.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_shardsvr_replicas[]" value="2" min="1" max="7"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
         <div class="form-group"><label>Arbiters / Shard <span class="field-tip" data-tip="Number of arbiters per shard replica set. Use 0 for none.">ⓘ</span></label><div class="number-stepper"><button type="button" class="stepper-btn" onclick="stepNumber(this,-1)">−</button><input type="number" name="cluster_arbiters_per_replset[]" value="1" min="0" max="3"><button type="button" class="stepper-btn" onclick="stepNumber(this,1)">+</button></div></div>
       </div>
-      ${dockerRows}${computeRows}
+      ${buildAuditRows('cluster')}${dockerRows}${computeRows}
     </div>`;
   document.getElementById('clusters-container').appendChild(c);
   syncDockerPmmDependencies(document.getElementById('enable-pmm-docker')?.checked);
@@ -2081,7 +2134,7 @@ function addReplset() {
           <input type="number" name="replset_port[]" value="${randomPort}" placeholder="auto" min="1024" max="65000">
           </div>` : ''}
       </div>
-      ${dockerRows}${computeRows}
+      ${buildAuditRows('replset')}${dockerRows}${computeRows}
     </div>`;
   document.getElementById('replsets-container').appendChild(c);
   syncDockerPmmDependencies(document.getElementById('enable-pmm-docker')?.checked);
@@ -2520,9 +2573,31 @@ function validateDockerPortConflicts(config) {
   return `Docker port conflicts detected: ${conflicts.join('; ')}`;
 }
 
+function getBlockFieldValue(block, name) {
+  const field = block.querySelector(`[name="${name}"]`);
+  return field ? field.value : '';
+}
+
+function getBlockChecked(block, name) {
+  const field = block.querySelector(`[name="${name}"]`);
+  return !!field && field.checked;
+}
+
+function getBlockImageValue(block, name, prefix) {
+  const field = block.querySelector(`[name="${name}"]`);
+  if (!field) return '';
+  const tag = field.value;
+  if (tag === '__custom__') {
+    const customField = block.querySelector(`[name="${name.replace('[]', '_custom')}"]`);
+    return customField ? customField.value.trim() : '';
+  }
+  return tag ? `${prefix}:${tag}` : '';
+}
+
 document.getElementById('config-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
+  const submitBtn = form.querySelector('[type=submit]');
   const fd = new FormData(form);
 
   // Validate mandatory CHAOS API token before doing anything else.
@@ -2666,79 +2741,63 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   }
 
   // Clusters
-  const clNames     = fd.getAll('cluster_name[]');
-  const clEnvTag    = fd.getAll('cluster_env_tag[]');
-  const clCfgsvr    = fd.getAll('cluster_configsvr_count[]');
-  const clShards    = fd.getAll('cluster_shard_count[]');
-  const clReplicas  = fd.getAll('cluster_shardsvr_replicas[]');
-  const clArbiters  = fd.getAll('cluster_arbiters_per_replset[]');
-  const clMongos    = fd.getAll('cluster_mongos_count[]');
-  const clPsmdb     = fd.getAll('cluster_psmdb_image[]');
-  const clPbm       = fd.getAll('cluster_pbm_image[]');
-  const clPmmClient = fd.getAll('cluster_pmm_client_image[]');
-  const clEnPmm     = fd.getAll('cluster_enable_pmm[]');
-  const clEnPbm     = fd.getAll('cluster_enable_pbm[]');
-  const clBind      = fd.getAll('cluster_bind_to_localhost[]');
   config.clusters = {};
-  for (let i = 0; i < clNames.length; i++) {
-    const name = clNames[i].trim();
-    if (!name) continue;
+  document.querySelectorAll('#clusters-container > .component-block').forEach(block => {
+    const name = getBlockFieldValue(block, 'cluster_name[]').trim();
+    if (!name) return;
     const c = {
-      env_tag: clEnvTag[i] || 'test',
-      configsvr_count: parseInt(clCfgsvr[i]) || 3,
-      shard_count: parseInt(clShards[i]) || 2,
-      shardsvr_replicas: parseInt(clReplicas[i]) || 2,
-      arbiters_per_replset: parseInt(clArbiters[i] || '1'),
-      mongos_count: parseInt(clMongos[i]) || 2,
+      env_tag: getBlockFieldValue(block, 'cluster_env_tag[]') || 'test',
+      configsvr_count: parseInt(getBlockFieldValue(block, 'cluster_configsvr_count[]')) || 3,
+      shard_count: parseInt(getBlockFieldValue(block, 'cluster_shard_count[]')) || 2,
+      shardsvr_replicas: parseInt(getBlockFieldValue(block, 'cluster_shardsvr_replicas[]')) || 2,
+      arbiters_per_replset: parseInt(getBlockFieldValue(block, 'cluster_arbiters_per_replset[]') || '1'),
+      mongos_count: parseInt(getBlockFieldValue(block, 'cluster_mongos_count[]')) || 2,
+      enable_audit: getBlockChecked(block, 'cluster_enable_audit[]'),
     };
+    const auditFilter = getBlockFieldValue(block, 'cluster_audit_filter[]').trim();
+    if (c.enable_audit && auditFilter && auditFilter !== DEFAULT_AUDIT_FILTER) c.audit_filter = auditFilter;
     if (PLATFORM === 'docker') {
-      const resolveDockerImg = (prefix, tag, customVal) =>
-        tag === '__custom__' ? (customVal || '') : (tag ? `${prefix}:${tag}` : '');
-      if (clPsmdb[i]) c.psmdb_image = resolveDockerImg('percona/percona-server-mongodb', clPsmdb[i], fd.getAll('cluster_psmdb_image_custom')[i]);
-      if (clPbm[i])   c.pbm_image   = resolveDockerImg('percona/percona-backup-mongodb', clPbm[i],   fd.getAll('cluster_pbm_image_custom')[i]);
-      if (clPmmClient[i]) c.pmm_client_image = resolveDockerImg('percona/pmm-client', clPmmClient[i], fd.getAll('cluster_pmm_client_image_custom')[i]);
-      c.enable_pmm = clEnPmm.some((v,idx) => idx === i && v === '1');
-      c.enable_pbm = clEnPbm.some((v,idx) => idx === i && v === '1');
-      c.bind_to_localhost = clBind.some((v,idx) => idx === i && v === '1');
+      const psmdbImage = getBlockImageValue(block, 'cluster_psmdb_image[]', 'percona/percona-server-mongodb');
+      const pbmImage = getBlockImageValue(block, 'cluster_pbm_image[]', 'percona/percona-backup-mongodb');
+      const pmmClientImage = getBlockImageValue(block, 'cluster_pmm_client_image[]', 'percona/pmm-client');
+      if (psmdbImage) c.psmdb_image = psmdbImage;
+      if (pbmImage) c.pbm_image = pbmImage;
+      if (pmmClientImage) c.pmm_client_image = pmmClientImage;
+      c.enable_pmm = getBlockChecked(block, 'cluster_enable_pmm[]');
+      c.enable_pbm = getBlockChecked(block, 'cluster_enable_pbm[]');
+      c.bind_to_localhost = getBlockChecked(block, 'cluster_bind_to_localhost[]');
     }
     config.clusters[name] = c;
-  }
+  });
 
   // Replica Sets
-  const rsNames   = fd.getAll('replset_name[]');
-  const rsEnvTag  = fd.getAll('replset_env_tag[]');
-  const rsNodes   = fd.getAll('replset_data_nodes[]');
-  const rsArbiters= fd.getAll('replset_arbiters[]');
-  const rsPorts   = fd.getAll('replset_port[]');
-  const rsPsmdb   = fd.getAll('replset_psmdb_image[]');
-  const rsPbm     = fd.getAll('replset_pbm_image[]');
-  const rsPmmClient = fd.getAll('replset_pmm_client_image[]');
-  const rsEnPmm   = fd.getAll('replset_enable_pmm[]');
-  const rsEnPbm   = fd.getAll('replset_enable_pbm[]');
-  const rsBind    = fd.getAll('replset_bind_to_localhost[]');
   config.replsets = {};
-  for (let i = 0; i < rsNames.length; i++) {
-    const name = rsNames[i].trim();
-    if (!name) continue;
+  document.querySelectorAll('#replsets-container > .component-block').forEach(block => {
+    const name = getBlockFieldValue(block, 'replset_name[]').trim();
+    if (!name) return;
     const r = {
-      env_tag: rsEnvTag[i] || 'test',
-      data_nodes_per_replset: parseInt(rsNodes[i] || '2'),
-      arbiters_per_replset: parseInt(rsArbiters[i] || '1'),
+      env_tag: getBlockFieldValue(block, 'replset_env_tag[]') || 'test',
+      data_nodes_per_replset: parseInt(getBlockFieldValue(block, 'replset_data_nodes[]') || '2'),
+      arbiters_per_replset: parseInt(getBlockFieldValue(block, 'replset_arbiters[]') || '1'),
+      enable_audit: getBlockChecked(block, 'replset_enable_audit[]'),
     };
+    const auditFilter = getBlockFieldValue(block, 'replset_audit_filter[]').trim();
+    if (r.enable_audit && auditFilter && auditFilter !== DEFAULT_AUDIT_FILTER) r.audit_filter = auditFilter;
     if (PLATFORM === 'docker') {
-      const resolveDockerImg = (prefix, tag, customVal) =>
-        tag === '__custom__' ? (customVal || '') : (tag ? `${prefix}:${tag}` : '');
-      const port = parseInt(rsPorts[i]);
+      const port = parseInt(getBlockFieldValue(block, 'replset_port[]'));
       if (port > 0) { r.replset_port = port; r.arbiter_port = port; }
-      if (rsPsmdb[i]) r.psmdb_image = resolveDockerImg('percona/percona-server-mongodb', rsPsmdb[i], fd.getAll('replset_psmdb_image_custom')[i]);
-      if (rsPbm[i])   r.pbm_image   = resolveDockerImg('percona/percona-backup-mongodb', rsPbm[i],   fd.getAll('replset_pbm_image_custom')[i]);
-      if (rsPmmClient[i]) r.pmm_client_image = resolveDockerImg('percona/pmm-client', rsPmmClient[i], fd.getAll('replset_pmm_client_image_custom')[i]);
-      r.enable_pmm = rsEnPmm.some((v,idx) => idx === i && v === '1');
-      r.enable_pbm = rsEnPbm.some((v,idx) => idx === i && v === '1');
-      r.bind_to_localhost = rsBind.some((v,idx) => idx === i && v === '1');
+      const psmdbImage = getBlockImageValue(block, 'replset_psmdb_image[]', 'percona/percona-server-mongodb');
+      const pbmImage = getBlockImageValue(block, 'replset_pbm_image[]', 'percona/percona-backup-mongodb');
+      const pmmClientImage = getBlockImageValue(block, 'replset_pmm_client_image[]', 'percona/pmm-client');
+      if (psmdbImage) r.psmdb_image = psmdbImage;
+      if (pbmImage) r.pbm_image = pbmImage;
+      if (pmmClientImage) r.pmm_client_image = pmmClientImage;
+      r.enable_pmm = getBlockChecked(block, 'replset_enable_pmm[]');
+      r.enable_pbm = getBlockChecked(block, 'replset_enable_pbm[]');
+      r.bind_to_localhost = getBlockChecked(block, 'replset_bind_to_localhost[]');
     }
     config.replsets[name] = r;
-  }
+  });
 
   // PMM Servers (Docker)
   if (PLATFORM === 'docker') {
@@ -2820,7 +2879,6 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     }
   }
 
-  const submitBtn = form.querySelector('[type=submit]');
   submitBtn.disabled = true;
   submitBtn.textContent = 'Saving…';
   try {

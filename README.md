@@ -21,6 +21,7 @@ browser instead of editing `.tfvars` files by hand.
 
 Key features:
 - Visual wizard for cluster topology, images/packages, credentials, and networking
+- Audit plugin controls for every cluster and replica set, including enable/disable and custom filter expressions
 - Live deployment log streamed in the browser via Server-Sent Events
 - Hosts & Connections panel with one-click SSH/`docker exec` commands, MongoDB connection
   strings, and direct links to PMM and MinIO Console web UIs
@@ -34,6 +35,27 @@ go run .
 ```
 
 See [`ui-go/README.md`](./ui-go/README.md) for full details.
+
+## Audit Plugin
+
+All deployment types support configuring the PSMDB audit plugin per sharded cluster and per replica set.
+
+- `enable_audit` is disabled by default
+- audited events are written to a file
+- the default `audit_filter` captures write operations for non-system users only
+
+In the Web UI, each cluster and replica set has Audit controls for enabling/disabling the plugin. The filter field only appears after audit is enabled.
+
+When editing `.tfvars` manually, set these fields inside each `clusters` or `replsets` entry:
+
+```hcl
+clusters = {
+  cl01 = {
+    enable_audit = false
+    audit_filter = "{ atype: \"authCheck\", \"param.command\": { $in: [ \"insert\", \"update\", \"delete\", \"findandmodify\" ] }, \"users.user\": { $not: /^__/ } }"
+  }
+}
+```
 
 ## Manual Instructions (without the Web UI)
 

@@ -85,6 +85,15 @@
         - "{{ mongod_path }}"
         - "{{ mongod_log_path }}"
 
+    - name: Ensure audit log directory exists
+      become: yes
+      file:
+        path: "{{ audit_log_path | dirname }}"
+        owner: mongod
+        mode: '0750'
+        state: directory
+      when: enable_audit | bool
+
     - name: Set up keyfile for encryption at rest
       become: yes
       copy:

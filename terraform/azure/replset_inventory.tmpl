@@ -38,3 +38,7 @@ pmm_client_version=${pmm_client_version}
 %{ endif ~}
 env_tag=${env_tag}
 account=${account}
+enable_audit=${enable_audit}
+%{ if audit_filter != "" ~}
+audit_filter=${audit_filter}
+%{ endif ~}

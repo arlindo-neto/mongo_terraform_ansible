@@ -47,6 +47,18 @@ variable "arbiters_per_replset" {
   description = "Number of arbiters per replica set"
 }
 
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = ""
+  description = "Optional audit filter override passed to Ansible inventory"
+}
+
 ######################
 # Data bearing members
 ######################
@@ -57,8 +69,8 @@ variable "replset_tag" {
 }
 
 variable "replsetsvr_port" {
-  type        = number
-  default     = 27017
+  type    = number
+  default = 27017
 }
 
 variable "replsetsvr_volume_size" {
@@ -89,8 +101,8 @@ variable "arbiter_type" {
 }
 
 variable "arbiter_port" {
-  type        = number
-  default     = 27017
+  type    = number
+  default = 27017
 }
 
 #############
@@ -130,28 +142,28 @@ variable "data_disk_type" {
 #############
 
 variable "resource_group_name" {
-  type        = string
-  default     = "mongodb"
+  type    = string
+  default = "mongodb"
 }
 
 variable "location" {
-  type        = string
-  default     = "eastus" # Azure region, e.g. eastus, westeurope
+  type    = string
+  default = "eastus" # Azure region, e.g. eastus, westeurope
 }
 
 variable "vnet_name" {
-  type        = string
-  default     = "mongo-terraform"
+  type    = string
+  default = "mongo-terraform"
 }
 
 variable "subnet" {
-  type        = string
-  default     = "mongo-subnet"
+  type    = string
+  default = "mongo-subnet"
 }
 
 variable "subnet_cidr" {
-  type        = string
-  default     = "10.128.0.0/20"
+  type    = string
+  default = "10.128.0.0/20"
 }
 
 variable "source_ranges" {

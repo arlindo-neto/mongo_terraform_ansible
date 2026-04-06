@@ -10,6 +10,14 @@ systemLog:
   logRotate: reopen
   path: {{ mongod_log_path }}/mongod.log
 
+{% if enable_audit %}
+auditLog:
+  destination: file
+  format: JSON
+  path: {{ audit_log_path }}
+  filter: '{{ audit_filter }}'
+{% endif %}
+
 # Where and how to store data.
 storage:
   dbPath: {{ mongod_path }}
@@ -63,6 +71,11 @@ operationProfiling:
    mode: all
 #   slowOpSampleRate: 0.1
    rateLimit: 100
+
+{% if enable_audit %}
+setParameter:
+  auditAuthorizationSuccess: true
+{% endif %}
 
 replication:
   replSetName: {{ cluster }}-{{ group_names[0] }} 

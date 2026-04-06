@@ -29,6 +29,13 @@ resource "docker_container" "cfg" {
     "--slowms", "200",
     "--rateLimit", "100"
     ],
+    var.enable_audit ? [
+      "--auditDestination", "file",
+      "--auditFormat", "JSON",
+      "--auditPath", "/var/log/mongodb-audit.json",
+      "--auditFilter", "${var.audit_filter}",
+      "--setParameter", "auditAuthorizationSuccess=true"
+    ] : [],
     var.enable_ldap ? [
       "--setParameter", "authenticationMechanisms=PLAIN,SCRAM-SHA-256",
       "--ldapQueryUser", "${var.ldap_bind_dn}",

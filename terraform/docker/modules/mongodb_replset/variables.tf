@@ -1,16 +1,16 @@
 variable "rs_name" {
   description = "Name of the MongoDB replicaset"
-  default = "rs01"
+  default     = "rs01"
 }
 
 variable "env_tag" {
   description = "Name of the Environment"
-  default = "test"
+  default     = "test"
 }
 
 variable "domain_name" {
   description = "Name of the DNS domain"
-  default = ""
+  default     = ""
 }
 
 ##################
@@ -18,12 +18,12 @@ variable "domain_name" {
 ##################
 
 variable "data_nodes_per_replset" {
-  default = "2"
+  default     = "2"
   description = "How many data bearing nodes per replset"
 }
 
 variable "arbiters_per_replset" {
-  default = "1"
+  default     = "1"
   description = "Number of arbiters per replica set"
 }
 
@@ -32,30 +32,42 @@ variable "arbiters_per_replset" {
 ######################
 
 variable "keyfile_contents" {
-  default = "KYYVuRIooX+S2Ee6GDUpYiI6rpx879XYYwWD44tF/WtogW0o8Z4Ua0/Fs+Nez4GO"
+  default     = "KYYVuRIooX+S2Ee6GDUpYiI6rpx879XYYwWD44tF/WtogW0o8Z4Ua0/Fs+Nez4GO"
   description = "Content of the keyfile for MongoDB replicaset member authentication"
-  sensitive   = true  
+  sensitive   = true
 }
 
 variable "keyfile_path" {
-  default = "/etc/mongo"
+  default     = "/etc/mongo"
   description = "Path to the keyfile on MongoDB containers"
 }
 
 variable "keyfile_name" {
-  default = "mongodb-keyfile.key"
+  default     = "mongodb-keyfile.key"
   description = "Name of the file containing the keyfile on MongoDB containers"
 }
 
 variable "mongodb_root_user" {
-  default = "root"
+  default     = "root"
   description = "MongoDB user to be created with root perms"
 }
 
 variable "mongodb_root_password" {
-  default = "percona"
+  default     = "percona"
   description = "MongoDB root user password"
   sensitive   = true
+}
+
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = "{ atype: \"authCheck\", \"param.command\": { $in: [ \"insert\", \"update\", \"delete\", \"findandmodify\" ] }, \"users.user\": { $not: /^__/ } }"
+  description = "Audit filter applied to mongod and mongos containers"
 }
 
 ######################
@@ -64,12 +76,12 @@ variable "mongodb_root_password" {
 
 variable "replset_tag" {
   description = "Name of the replicaset servers"
-  default = "svr"
+  default     = "svr"
 }
 
 variable "replset_port" {
   description = "Port of the replset servers"
-  default = "27017"
+  default     = "27017"
 }
 
 #############
@@ -78,12 +90,12 @@ variable "replset_port" {
 
 variable "arbiter_tag" {
   description = "Name of the arbiter servers"
-  default = "arb"
+  default     = "arb"
 }
 
 variable "arbiter_port" {
   description = "Port of the arbiter servers"
-  default = "27017"
+  default     = "27017"
 }
 
 #############
@@ -98,24 +110,24 @@ variable "enable_pmm" {
 
 variable "pmm_host" {
   description = "Name of the PMM server"
-  default = "pmm-server"
+  default     = "pmm-server"
 }
 
 variable "pmm_server_user" {
   description = "Name of the PMM server admin user"
-  default = "admin"
-  type = string
+  default     = "admin"
+  type        = string
 }
 
 variable "pmm_server_pwd" {
   description = "Password of the PMM server admin user"
-  default = "admin"
-  type = string
-  sensitive   = true  
+  default     = "admin"
+  type        = string
+  sensitive   = true
 }
 
 variable "pmm_client_container_suffix" {
-  default = "pmm-client"
+  default     = "pmm-client"
   description = "Suffix for PMM client container"
 }
 
@@ -127,14 +139,14 @@ variable "pmm_port" {
 }
 
 variable "mongodb_pmm_user" {
-  default = "pmm"
+  default     = "pmm"
   description = "MongoDB user to be created with for PBM"
 }
 
 variable "mongodb_pmm_password" {
-  default = "percona"
+  default     = "percona"
   description = "MongoDB PBM user password"
-  sensitive   = true  
+  sensitive   = true
 }
 
 #############
@@ -148,24 +160,24 @@ variable "enable_pbm" {
 }
 
 variable "pbm_container_suffix" {
-  default = "pbm-agent"
+  default     = "pbm-agent"
   description = "Suffix for PBM agent containers. Will be appended to each cluster component"
 }
 
 variable "pbm_cli_container_suffix" {
-  default = "pbm-cli"
+  default     = "pbm-cli"
   description = "Suffix for PBM CLI container"
 }
 
 variable "mongodb_pbm_user" {
-  default = "pbmuser"
+  default     = "pbmuser"
   description = "MongoDB user to be created with for PBM"
 }
 
 variable "mongodb_pbm_password" {
-  default = "percona"
+  default     = "percona"
   description = "MongoDB PBM user password"
-  sensitive   = true  
+  sensitive   = true
 }
 
 #############
@@ -178,8 +190,8 @@ variable "minio_region" {
 }
 
 variable "minio_access_key" {
-  default = "minio"
-  sensitive   = true  
+  default   = "minio"
+  sensitive = true
 }
 
 variable "minio_server" {
@@ -191,14 +203,14 @@ variable "minio_port" {
 }
 
 variable "minio_secret_key" {
-  default = "minioadmin"
-  sensitive   = true  
+  default   = "minioadmin"
+  sensitive = true
 }
 
 variable "bucket_name" {
-  default = "mongo-backups"
+  default     = "mongo-backups"
   description = "S3-compatible storage to put backups"
- }
+}
 
 ###############
 # Docker Images
@@ -206,17 +218,17 @@ variable "bucket_name" {
 
 variable "psmdb_image" {
   description = "Docker image for MongoDB"
-  default = "percona/percona-server-mongodb:latest"
+  default     = "percona/percona-server-mongodb:latest"
 }
 
 variable "pbm_image" {
   description = "Docker image for PBM"
-  default = "percona/percona-backup-mongodb:latest"
+  default     = "percona/percona-backup-mongodb:latest"
 }
 
 variable "pmm_client_image" {
   description = "Docker image for PMM client"
-  default = "percona/pmm-client:latest"
+  default     = "percona/pmm-client:latest"
   #default = "perconalab/pmm-client:3-dev-latest"
 }
 
@@ -230,12 +242,12 @@ variable "base_os_image" {
 
 variable "pbm_mongod_image" {
   description = "Name of the local Docker image to be created for pbm-agent + current mongod version. Required for physical restores"
-  default = "percona/pbm-agent"
+  default     = "percona/pbm-agent"
 }
 
 variable "uid" {
   description = "The user id under which the main process runs in the container created for pbm-agent + current mongod version"
-  default = 1001
+  default     = 1001
 }
 
 #############
@@ -248,8 +260,8 @@ variable "network_name" {
 }
 
 variable "bind_to_localhost" {
-  type = bool
-  default = true 
+  type        = bool
+  default     = true
   description = "Bind container ports to localhost (127.0.0.1) if true, otherwise to 0.0.0.0"
 }
 
@@ -302,7 +314,7 @@ variable "enable_encryption_rest" {
 }
 
 variable "vault_token" {
-  default = "root"
+  default   = "root"
   sensitive = true
 }
 

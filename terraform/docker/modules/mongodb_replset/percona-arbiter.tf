@@ -15,13 +15,22 @@ resource "docker_container" "arbiter" {
     type      = "volume"
     read_only = true
   }
-  command = [
-    "mongod",
-    "--replSet", "${var.rs_name}",
-    "--bind_ip_all",
-    "--port", "${var.arbiter_port + var.data_nodes_per_replset + count.index}",
-    "--keyFile", "${var.keyfile_path}/${var.keyfile_name}"
-  ]
+  command = concat(
+    [
+      "mongod",
+      "--replSet", "${var.rs_name}",
+      "--bind_ip_all",
+      "--port", "${var.arbiter_port + var.data_nodes_per_replset + count.index}",
+      "--keyFile", "${var.keyfile_path}/${var.keyfile_name}"
+    ],
+    var.enable_audit ? [
+      "--auditDestination", "file",
+      "--auditFormat", "JSON",
+      "--auditPath", "/var/log/mongodb-audit.json",
+      "--auditFilter", "${var.audit_filter}",
+      "--setParameter", "auditAuthorizationSuccess=true"
+    ] : []
+  )
   ports {
     internal = var.arbiter_port + var.data_nodes_per_replset + count.index
     external = var.arbiter_port + var.data_nodes_per_replset + count.index

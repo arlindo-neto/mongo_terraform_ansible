@@ -15,6 +15,13 @@ resource "docker_container" "mongos" {
     "--rateLimit", "100",
     "--setParameter", "diagnosticDataCollectionDirectoryPath=/var/log/mongo/mongos.diagnostic.data/"
     ],
+    var.enable_audit ? [
+      "--auditDestination", "file",
+      "--auditFormat", "JSON",
+      "--auditPath", "/var/log/mongodb-audit.json",
+      "--auditFilter", "${var.audit_filter}",
+      "--setParameter", "auditAuthorizationSuccess=true"
+    ] : [],
     var.enable_ldap ? [
       "--setParameter", "authenticationMechanisms=PLAIN,SCRAM-SHA-256",
       "--ldapQueryUser", "${var.ldap_bind_dn}",

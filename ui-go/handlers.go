@@ -136,6 +136,7 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 		Platform:                      platform,
 		EnvID:                         envID,
 		Config:                        cfg,
+		DefaultAuditFilter:            defaultAuditFilter,
 		OSUser:                        osUser,
 		DockerDefaultPmmExternalPort:  dockerDefaultPmmExternalPort,
 		DockerDefaultMinioPort:        dockerDefaultMinioPort,

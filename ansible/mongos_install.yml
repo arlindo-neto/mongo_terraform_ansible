@@ -51,6 +51,15 @@
         owner: mongod
         group: mongod
 
+    - name: Ensure audit log directory exists
+      file:
+        path: "{{ audit_log_path | dirname }}"
+        state: directory
+        mode: '0750'
+        owner: mongod
+        group: mongod
+      when: enable_audit | bool
+
     - name: Configure mongo shell alias
       lineinfile:
         path: /etc/profile

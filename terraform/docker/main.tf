@@ -51,6 +51,8 @@ module "mongodb_clusters" {
   ldap_bind_dn          = each.value.ldap_bind_dn
   ldap_bind_pw          = each.value.ldap_bind_pw
   ldap_user_search_base = each.value.ldap_user_search_base
+  enable_audit          = each.value.enable_audit
+  audit_filter          = each.value.audit_filter
   #  enable_tls              = each.value.enable_tls
   #  tls_cert_file           = each.value.tls_cert_file
   #  tls_key_file            = each.value.tls_key_file
@@ -98,6 +100,8 @@ module "mongodb_replsets" {
   ldap_bind_dn           = each.value.ldap_bind_dn
   ldap_bind_pw           = each.value.ldap_bind_pw
   ldap_user_search_base  = each.value.ldap_user_search_base
+  enable_audit           = each.value.enable_audit
+  audit_filter           = each.value.audit_filter
   #  enable_tls              = each.value.enable_tls
   #  tls_cert_file           = each.value.tls_cert_file
   #  tls_key_file            = each.value.tls_key_file

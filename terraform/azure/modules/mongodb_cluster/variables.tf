@@ -59,6 +59,18 @@ variable "mongos_count" {
   description = "Number of mongos to provision"
 }
 
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = ""
+  description = "Optional audit filter override passed to Ansible inventory"
+}
+
 ################
 # Shards
 ################
@@ -185,8 +197,8 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  type    = string
-  default = "eastus"
+  type        = string
+  default     = "eastus"
   description = "Azure region (e.g., eastus, westus2, etc.)"
 }
 
@@ -206,7 +218,7 @@ variable "subnet_cidr" {
 }
 
 variable "source_ranges" {
-  type    = string
-  default = "0.0.0.0/0"
+  type        = string
+  default     = "0.0.0.0/0"
   description = "CIDR range to allow traffic from (for NSG rules)"
 }

@@ -24,6 +24,8 @@ variable "clusters" {
     shardsvr_replicas    = optional(number, 2)      # How many data bearing nodes per shard
     arbiters_per_replset = optional(number, 1)      # Number of arbiters per replica set
     mongos_count         = optional(number, 2)      # Number of mongos to provision
+    enable_audit         = optional(bool, false)    # Enable audit logging
+    audit_filter         = optional(string, "")     # Optional audit filter override
   }))
 
   default = {
@@ -45,6 +47,8 @@ variable "replsets" {
     env_tag                = optional(string, "test") # Name of Environment
     data_nodes_per_replset = optional(number, 2)      # Number of data bearing members per replset
     arbiters_per_replset   = optional(number, 1)      # Number of arbiters per replica set
+    enable_audit           = optional(bool, false)    # Enable audit logging
+    audit_filter           = optional(string, "")     # Optional audit filter override
   }))
 
   default = {

@@ -3,8 +3,8 @@
 ################
 
 variable "prefix" {
-  type    = string
-  default = "ig"
+  type        = string
+  default     = "ig"
   description = "Prefix to be applied to the resources created, make sure to change it to avoid collisions with other users projects"
 }
 
@@ -55,6 +55,18 @@ variable "mongos_count" {
   type        = number
   default     = 1
   description = "Number of mongos to provision"
+}
+
+variable "enable_audit" {
+  type        = bool
+  default     = false
+  description = "Enable audit logging for this deployment"
+}
+
+variable "audit_filter" {
+  type        = string
+  default     = ""
+  description = "Optional audit filter override passed to Ansible inventory"
 }
 
 ################

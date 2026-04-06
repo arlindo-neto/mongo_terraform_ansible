@@ -10,6 +10,14 @@ systemLog:
   logRotate: reopen
   path: {{ mongod_log_path }}/mongos.log
 
+{% if enable_audit %}
+auditLog:
+  destination: file
+  format: JSON
+  path: {{ audit_log_path }}
+  filter: '{{ audit_filter }}'
+{% endif %}
+
 # how the process runs
 processManagement:
   fork: true  # fork and run in background
@@ -37,6 +45,11 @@ operationProfiling:
    slowOpThresholdMs: 200
 #   slowOpSampleRate: 0.1
    rateLimit: 100
+
+{% if enable_audit %}
+setParameter:
+  auditAuthorizationSuccess: true
+{% endif %}
 
 sharding:
   configDB: {{ cluster }}-cfg/{% for h in groups[ 'cfg' ] %}{{ hostvars[h].ansible_fqdn  }}:{{ cfg_server_port }}{% if not loop.last %},{% endif %}{% endfor %}

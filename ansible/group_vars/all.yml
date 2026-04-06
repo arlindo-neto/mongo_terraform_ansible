@@ -61,6 +61,12 @@ mongo_admin_password: percona
 
 mongod_log_path: /var/log/mongo/
 mongod_path: /var/lib/mongo/
+enable_audit: false
+audit_log_path: /var/log/mongo/auditLog.json
+
+# Default audit policy: log successful write authorization checks for non-system users.
+# Override audit_filter per deployment or via --extra-vars when needed.
+audit_filter: '{ atype: "authCheck", "param.command": { $in: [ "insert", "update", "delete", "findandmodify" ] }, "users.user": { $not: /^__/ } }'
 
 thp_location: /usr/lib/systemd/system/disable-thp.service
 

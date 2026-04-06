@@ -46,3 +46,11 @@ output "rs_name" {
 output "env_tag" {
   value = var.env_tag
 }
+
+output "enable_audit" {
+  value = var.enable_audit
+}
+
+output "audit_filter" {
+  value = var.audit_filter
+}

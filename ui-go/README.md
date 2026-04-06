@@ -154,10 +154,13 @@ Then open **http://127.0.0.1:5001** in your browser.
 
 1. **Platform selection** – choose AWS, GCP, Azure, CHAOS or Docker.
 2. **Configuration wizard** – fill in cluster topology, images/packages, credentials,
-   networking, and (for cloud platforms) per-component instance types and disk sizes.
-   - Image tags are fetched live from Docker Hub on startup and cached for 5 minutes.
-   - Percona package release identifiers (`psmdb-80`, …) are fetched from the Percona
-     repository listing on startup.
+    networking, and (for cloud platforms) per-component instance types and disk sizes.
+    - Image tags are fetched live from Docker Hub on startup and cached for 5 minutes.
+    - Percona package release identifiers (`psmdb-80`, …) are fetched from the Percona
+      repository listing on startup.
+    - Each cluster and replica set includes audit plugin controls. Audit is enabled by
+      default and uses the built-in write-only filter for non-system users unless you
+      override it.
 3. **Save** – writes `<env_id>.tfvars` inside the corresponding `../terraform/<platform>/`
    directory and records the environment in `environments.json`.
 4. **Deploy** – runs `terraform init && terraform apply` (and Ansible for cloud platforms)
