@@ -84,6 +84,35 @@ func TestWriteTfvarsDockerEmptyPmmServersMap(t *testing.T) {
 	}
 }
 
+func TestWriteTfvarsCloudPmmClientVersion(t *testing.T) {
+	dir := t.TempDir()
+	origTerraformDir := terraformDir
+	terraformDir = dir
+	t.Cleanup(func() { terraformDir = origTerraformDir })
+
+	cfg := Config{
+		MongoRelease:     "psmdb-80",
+		PmmClientVersion: "3.4.0",
+		Clusters: map[string]ClusterConfig{
+			"cl01": {EnvTag: "test"},
+		},
+	}
+
+	if err := writeTfvars("cloud-pmm-client", "gcp", cfg); err != nil {
+		t.Fatalf("writeTfvars failed: %v", err)
+	}
+
+	content, err := os.ReadFile(tfvarsPath("cloud-pmm-client", "gcp"))
+	if err != nil {
+		t.Fatalf("read tfvars failed: %v", err)
+	}
+	tfvars := string(content)
+
+	if !strings.Contains(tfvars, "pmm_client_version = \"3.4.0\"") {
+		t.Fatalf("expected pmm_client_version in tfvars:\n%s", tfvars)
+	}
+}
+
 func TestAssignDockerReplsetPortsAvoidsServicePorts(t *testing.T) {
 	cfg := &Config{
 		Replsets: map[string]ReplsetConfig{

@@ -136,6 +136,7 @@ func writeTfvars(envID, platform string, cfg Config) error {
 		writeOptStr("mongo_version", cfg.MongoVersion)
 		writeOptStr("pbm_release", cfg.PbmRelease)
 		writeOptStr("pbm_version", cfg.PbmVersion)
+		writeOptStr("pmm_client_version", cfg.PmmClientVersion)
 
 		if platform == "chaos" {
 			// CHAOS-specific vars

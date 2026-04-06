@@ -6,7 +6,7 @@ locals {
     minio_server     = var.minio_server
     minio_port       = var.minio_port
     minio_access_key = var.minio_access_key
-    minio_secret_key = var.minio_secret_key  
+    minio_secret_key = var.minio_secret_key
   })
 }
 
@@ -18,27 +18,31 @@ resource "local_file" "storage_config" {
 
 # PBM CLI container
 resource "docker_container" "pbm_cli" {
-  name  = "${var.cluster_name}-${var.pbm_cli_container_suffix}"
-  count = var.enable_pbm ? 1 : 0
-  image = docker_image.pbm.image_id 
+  name    = "${var.cluster_name}-${var.pbm_cli_container_suffix}"
+  count   = var.enable_pbm ? 1 : 0
+  image   = docker_image.pbm.image_id
   command = ["/bin/sh", "-c", "while true; do sleep 86400; done;"]
-  env = [ "PBM_MONGODB_URI=${var.mongodb_pbm_user}:${var.mongodb_pbm_password}@${docker_container.cfg[0].name}:${var.configsvr_port}" ]
+  env     = ["PBM_MONGODB_URI=${var.mongodb_pbm_user}:${var.mongodb_pbm_password}@${docker_container.cfg[0].name}:${var.configsvr_port}"]
   mounts {
-    source      = abspath(local_file.storage_config.filename)
-    target      = "/etc/pbm-storage.conf"
-    type        = "bind"
-  }  
-  network_mode = "bridge"     
+    source = abspath(local_file.storage_config.filename)
+    target = "/etc/pbm-storage.conf"
+    type   = "bind"
+  }
+  network_mode = "bridge"
   networks_advanced {
-    name = "${var.network_name}"
+    name = var.network_name
   }
   healthcheck {
-    test        = ["CMD-SHELL", "pbm version"]
-    interval    = "10s"
-    timeout     = "5s"
-    retries     = 5
+    test         = ["CMD-SHELL", "pbm version"]
+    interval     = "10s"
+    timeout      = "5s"
+    retries      = 5
     start_period = "30s"
-  }   
-  wait = true     
+  }
+  wait    = true
   restart = "on-failure"
+
+  lifecycle {
+    replace_triggered_by = [docker_image.pbm]
+  }
 }

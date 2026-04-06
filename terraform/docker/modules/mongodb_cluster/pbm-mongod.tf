@@ -1,10 +1,13 @@
 # Prepare the template for PBM docker image with the MongoDB binary of the version in use (required for physical restore)
 locals {
   pbm_mongod_image_dockerfile_content = templatefile("${path.module}/pbm-mongod.Dockerfile.tmpl", {
-    psmdb_image      = var.psmdb_image
-    pbm_image        = var.pbm_image
-    base_os_image    = var.base_os_image        
-  })  
+    psmdb_image    = var.psmdb_image
+    pbm_image      = var.pbm_image
+    base_os_image  = var.base_os_image
+    psmdb_digest   = data.docker_registry_image.psmdb.sha256_digest
+    pbm_digest     = data.docker_registry_image.pbm.sha256_digest
+    base_os_digest = data.docker_registry_image.base_os.sha256_digest
+  })
 }
 
 data "docker_registry_image" "psmdb" {
@@ -12,9 +15,9 @@ data "docker_registry_image" "psmdb" {
 }
 
 resource "docker_image" "psmdb" {
-  name         = var.psmdb_image
+  name          = data.docker_registry_image.psmdb.name
   pull_triggers = [data.docker_registry_image.psmdb.sha256_digest]
-  keep_locally = true
+  keep_locally  = true
 }
 
 data "docker_registry_image" "pbm" {
@@ -22,9 +25,9 @@ data "docker_registry_image" "pbm" {
 }
 
 resource "docker_image" "pbm" {
-  name         = var.pbm_image
+  name          = data.docker_registry_image.pbm.name
   pull_triggers = [data.docker_registry_image.pbm.sha256_digest]
-  keep_locally = true
+  keep_locally  = true
 }
 
 data "docker_registry_image" "base_os" {
@@ -32,9 +35,9 @@ data "docker_registry_image" "base_os" {
 }
 
 resource "docker_image" "base_os" {
-  name         = var.base_os_image
+  name          = data.docker_registry_image.base_os.name
   pull_triggers = [data.docker_registry_image.base_os.sha256_digest]
-  keep_locally = true
+  keep_locally  = true
 }
 
 # Write PBM Dockerfile to disk
@@ -50,7 +53,7 @@ resource "docker_image" "pbm_mongod" {
     docker_image.psmdb,
     docker_image.pbm,
     docker_image.base_os
-  ]  
+  ]
   name = "${var.cluster_name}-${var.pbm_mongod_image}"
   build {
     context    = path.module

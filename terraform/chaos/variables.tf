@@ -3,8 +3,8 @@
 ################
 
 variable "prefix" {
-  type    = string
-  default = "ig"
+  type        = string
+  default     = "ig"
   description = "Prefix to be applied to the resources created, make sure to change it to avoid collisions with other users projects"
 }
 
@@ -12,22 +12,22 @@ variable "prefix" {
 variable "clusters" {
   description = "MongoDB clusters to deploy"
   type = map(object({
-    env_tag              = optional(string, "test")  # Name of Environment for the cluster
-    configsvr_count      = optional(number, 3)       # Number of config servers to be used
-    shard_count          = optional(number, 2)       # Number of shards to be used
-    shardsvr_replicas    = optional(number, 2)       # How many data bearing nodes per shard
-    arbiters_per_replset = optional(number, 1)       # Number of arbiters per replica set
-    mongos_count         = optional(number, 2)       # Number of mongos to provision
+    env_tag              = optional(string, "test") # Name of Environment for the cluster
+    configsvr_count      = optional(number, 3)      # Number of config servers to be used
+    shard_count          = optional(number, 2)      # Number of shards to be used
+    shardsvr_replicas    = optional(number, 2)      # How many data bearing nodes per shard
+    arbiters_per_replset = optional(number, 1)      # Number of arbiters per replica set
+    mongos_count         = optional(number, 2)      # Number of mongos to provision
   }))
 
   default = {
     ig-cl01 = {
       env_tag = "test"
     }
-#    ig-cl02 = {
-#      env_tag = "prod"
-#      mongos_count = 1
-#    }
+    #    ig-cl02 = {
+    #      env_tag = "prod"
+    #      mongos_count = 1
+    #    }
   }
 }
 
@@ -36,18 +36,18 @@ variable "clusters" {
 variable "replsets" {
   description = "MongoDB replica sets to deploy"
   type = map(object({
-    env_tag                = optional(string, "test")  # Name of Environment
-    data_nodes_per_replset = optional(number, 2)       # Number of data bearing members per replset
-    arbiters_per_replset   = optional(number, 1)       # Number of arbiters per replica set
+    env_tag                = optional(string, "test") # Name of Environment
+    data_nodes_per_replset = optional(number, 2)      # Number of data bearing members per replset
+    arbiters_per_replset   = optional(number, 1)      # Number of arbiters per replica set
   }))
 
   default = {
-#    ig-rs01 = {
-#      env_tag = "test"
-#    }
-#    ig-rs02 = {
-#      env_tag = "prod"
-#    }
+    #    ig-rs01 = {
+    #      env_tag = "test"
+    #    }
+    #    ig-rs02 = {
+    #      env_tag = "prod"
+    #    }
   }
 }
 
@@ -336,4 +336,10 @@ variable "pbm_version" {
   type        = string
   default     = ""
   description = "Specific PBM version to install (e.g. 2.4.0). Empty string installs the latest available."
+}
+
+variable "pmm_client_version" {
+  type        = string
+  default     = ""
+  description = "Specific PMM client version to install (e.g. 3.4.0). Empty string installs the latest available."
 }

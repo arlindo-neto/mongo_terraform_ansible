@@ -170,6 +170,11 @@
     </table>
   </div>
   {{end}}
+
+  <div id="mongo-connections-summary" style="display:none">
+    <h3>MongoDB Connection Strings</h3>
+    <div id="mongo-connections-content"></div>
+  </div>
 </div>
 
 <!-- Hosts & Connections (loaded dynamically) -->
@@ -262,6 +267,24 @@
     </div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-outline" onclick="closeInventoryModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Connect command modal -->
+<div class="modal-backdrop" id="connect-modal" style="display:none" onclick="closeConnectModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="connect-modal-title">Connect</h2>
+    </div>
+    <div class="connect-command-panel">
+      <div class="copy-cmd-row copy-cmd-row-wrap">
+        <code class="copy-cmd-text copy-cmd-text-wrap" id="connect-command-text">Loading…</code>
+        <button class="btn btn-outline btn-xs copy-btn" id="connect-command-copy" title="Copy to clipboard">📋</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeConnectModal()">Close</button>
     </div>
   </div>
 </div>
@@ -830,6 +853,54 @@ function updateServiceURLButtons(serviceUrls) {
   if (row) row.style.display = '';
 }
 
+function renderMongoConnections(mongoConns) {
+  const section = document.getElementById('mongo-connections-summary');
+  const content = document.getElementById('mongo-connections-content');
+  if (!section || !content) return;
+
+  if (!mongoConns || mongoConns.length === 0) {
+    section.style.display = 'none';
+    content.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  mongoConns.forEach(c => {
+    const typeLabel = c.type === 'cluster' ? 'Sharded Cluster' : 'Replica Set';
+    function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    const displayConn = (c.conn_user && c.conn_pass)
+      ? c.conn_string.replace(new RegExp(escapeRegex(c.conn_pass), 'g'), '••••••')
+      : c.conn_string;
+    html += `<div class="conn-string-row">
+      <span class="conn-string-label">${escHtml(typeLabel)}: <strong>${escHtml(c.name)}</strong></span>
+      <div class="copy-cmd-row copy-cmd-row-wrap">
+        <code class="copy-cmd-text copy-cmd-text-wrap">${escHtml(displayConn)}</code>
+        <button class="btn btn-outline btn-xs copy-btn" data-copy="${escAttr(c.conn_string)}" onclick="copyText(this.dataset.copy, this)" title="Copy connection string (with real password)">📋</button>
+      </div>
+    </div>`;
+  });
+
+  content.innerHTML = html;
+  section.style.display = '';
+}
+
+function openConnectModal(name, command) {
+  document.getElementById('connect-modal-title').textContent = `Connect: ${name}`;
+  document.getElementById('connect-command-text').textContent = command;
+  const copyBtn = document.getElementById('connect-command-copy');
+  copyBtn.onclick = () => copyText(command, copyBtn);
+  document.getElementById('connect-modal').style.display = 'flex';
+}
+
+function openConnectModalFromButton(btn) {
+  openConnectModal(btn.dataset.name || 'Connect', btn.dataset.command || '');
+}
+
+function closeConnectModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('connect-modal').style.display = 'none';
+}
+
 function renderHosts(data) {
   const section = document.getElementById('hosts-section');
   const content = document.getElementById('hosts-content');
@@ -837,8 +908,9 @@ function renderHosts(data) {
   const mongoConns = data.mongo_conns || [];
 
   updateServiceURLButtons(data.service_urls || []);
+  renderMongoConnections(mongoConns);
 
-  if (!hosts.length && !mongoConns.length) {
+  if (!hosts.length) {
     const msg = data.message || 'No host information available yet. Run Deploy first.';
     content.innerHTML = `<p style="color:var(--color-muted)">${escHtml(msg)}</p>`;
     section.style.display = '';
@@ -884,7 +956,7 @@ function renderHosts(data) {
               <th class="sortable" data-col="0" onclick="sortHostsTable(this)">Name <span class="sort-icon">↕</span></th>
               <th class="sortable" data-col="1" onclick="sortHostsTable(this)">IP / Address <span class="sort-icon">↕</span></th>
               <th class="sortable" data-col="2" onclick="sortHostsTable(this)">Role <span class="sort-icon">↕</span></th>
-              <th>Connect</th>
+              <th>Action</th>
             </tr></thead>
             <tbody>`;
       groups[grp].forEach(h => {
@@ -893,41 +965,12 @@ function renderHosts(data) {
           <td class="host-ip"><code>${escHtml(h.ip)}</code></td>
           <td><span class="role-badge role-${escHtml(h.role)}">${escHtml(h.role)}</span></td>
           <td>
-            <div class="copy-cmd-row">
-              <code class="copy-cmd-text">${escHtml(h.connect_cmd)}</code>
-              <button class="btn btn-outline btn-xs copy-btn" data-copy="${escAttr(h.connect_cmd)}" onclick="copyText(this.dataset.copy, this)" title="Copy to clipboard">📋</button>
-            </div>
+            <button class="btn btn-outline btn-xs" data-name="${escAttr(h.name)}" data-command="${escAttr(h.connect_cmd)}" onclick="openConnectModalFromButton(this)">Connect</button>
           </td>
         </tr>`;
       });
       html += `</tbody></table></div></div>`;
     });
-  }
-
-  // ── MongoDB connection strings ──
-  if (mongoConns.length > 0) {
-    html += `<div class="hosts-group"><h3 class="hosts-group-title">🍃 MongoDB Connection Strings</h3>`;
-    mongoConns.forEach(c => {
-      const typeLabel = c.type === 'cluster' ? '🔀 Sharded Cluster' : '🔁 Replica Set';
-      // Build an obfuscated version for display: replace the real password with
-      // bullet characters so it is not visible on screen.  The real (full) URI
-      // is what gets copied to the clipboard.
-      // Use a literal string replaceAll (after escaping regex metacharacters)
-      // so every occurrence is replaced even if the password contains special
-      // characters.
-      function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-      const displayConn = (c.conn_user && c.conn_pass)
-        ? c.conn_string.replace(new RegExp(escapeRegex(c.conn_pass), 'g'), '••••••')
-        : c.conn_string;
-      html += `<div class="conn-string-row">
-        <span class="conn-string-label">${typeLabel}: <strong>${escHtml(c.name)}</strong></span>
-        <div class="copy-cmd-row">
-          <code class="copy-cmd-text">${escHtml(displayConn)}</code>
-          <button class="btn btn-outline btn-xs copy-btn" data-copy="${escAttr(c.conn_string)}" onclick="copyText(this.dataset.copy, this)" title="Copy connection string (with real password)">📋</button>
-        </div>
-      </div>`;
-    });
-    html += `</div>`;
   }
 
   content.innerHTML = html;

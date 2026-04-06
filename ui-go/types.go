@@ -81,11 +81,12 @@ type LdapServerConfig struct {
 // Config holds all user-configurable settings for an environment.
 type Config struct {
 	// General
-	Prefix       string `json:"prefix"`
-	MongoRelease string `json:"mongo_release,omitempty"`
-	MongoVersion string `json:"mongo_version,omitempty"`
-	PbmRelease   string `json:"pbm_release,omitempty"`
-	PbmVersion   string `json:"pbm_version,omitempty"`
+	Prefix           string `json:"prefix"`
+	MongoRelease     string `json:"mongo_release,omitempty"`
+	MongoVersion     string `json:"mongo_version,omitempty"`
+	PbmRelease       string `json:"pbm_release,omitempty"`
+	PbmVersion       string `json:"pbm_version,omitempty"`
+	PmmClientVersion string `json:"pmm_client_version,omitempty"`
 
 	// Cloud credentials / settings
 	ProjectID        string `json:"project_id,omitempty"`

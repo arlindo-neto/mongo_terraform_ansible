@@ -4,8 +4,8 @@ resource "docker_volume" "keyfile_volume" {
 }
 
 resource "docker_container" "init_keyfile" {
-  name  = "${var.cluster_name}-init_keyfile_container"
-  image = docker_image.base_os.image_id
+  name         = "${var.cluster_name}-init_keyfile_container"
+  image        = docker_image.base_os.image_id
   network_mode = "bridge"
   command = [
     "sh",
@@ -17,7 +17,11 @@ resource "docker_container" "init_keyfile" {
     source = docker_volume.keyfile_volume.name
     type   = "volume"
   }
-  user = "root"
+  user     = "root"
   must_run = false
   #rm = true
+
+  lifecycle {
+    replace_triggered_by = [docker_image.base_os]
+  }
 }

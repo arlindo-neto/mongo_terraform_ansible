@@ -3,14 +3,14 @@
 ################
 
 variable "prefix" {
-  type    = string
-  default = "ig"
+  type        = string
+  default     = "ig"
   description = "Prefix to be applied to the resources created, make sure to change it to avoid collisions with other users projects"
 }
 
 variable "project_id" {
-  type    = string
-  default = "gs-techleads"
+  type        = string
+  default     = "gs-techleads"
   description = "GCP project name. Replace with the project your GCP account belongs to"
 }
 
@@ -18,73 +18,73 @@ variable "project_id" {
 variable "clusters" {
   description = "MongoDB clusters to deploy"
   type = map(object({
-    env_tag               = optional(string, "test")                # Name of Environment for the cluster
-    configsvr_count       = optional(number, 3)                     # Number of config servers to be used
-    shard_count           = optional(number, 2)                     # Number of shards to be used
-    shardsvr_replicas     = optional(number, 2)                     # How many data bearing nodes per shard
-    arbiters_per_replset  = optional(number, 1)                     # Number of arbiters per replica set
-    mongos_count          = optional(number, 2)                     # Number of mongos to provision
+    env_tag              = optional(string, "test") # Name of Environment for the cluster
+    configsvr_count      = optional(number, 3)      # Number of config servers to be used
+    shard_count          = optional(number, 2)      # Number of shards to be used
+    shardsvr_replicas    = optional(number, 2)      # How many data bearing nodes per shard
+    arbiters_per_replset = optional(number, 1)      # Number of arbiters per replica set
+    mongos_count         = optional(number, 2)      # Number of mongos to provision
   }))
 
   default = {
     ig-cl01 = {
       env_tag = "test"
     }
-#    ig-cl02 = {
-#      env_tag = "prod"
-#      mongos_count = 1
-#   }
+    #    ig-cl02 = {
+    #      env_tag = "prod"
+    #      mongos_count = 1
+    #   }
   }
 }
 
 # By default, no replica sets are deployed (except those needed for the sharded clusters).
 # If you want to provision separate replica sets, uncomment the default below. Make sure to change the default name and prefix (ig-rs01) to avoid duplicates. 
 variable "replsets" {
-   description = "MongoDB replica sets to deploy"
-   type = map(object({
-     env_tag                   = optional(string, "test")               # Name of Environment
-     data_nodes_per_replset    = optional(number, 2)                    # Number of data bearing members per replset
-     arbiters_per_replset      = optional(number, 1)                    # Number of arbiters per replica set
-   })) 
+  description = "MongoDB replica sets to deploy"
+  type = map(object({
+    env_tag                = optional(string, "test") # Name of Environment
+    data_nodes_per_replset = optional(number, 2)      # Number of data bearing members per replset
+    arbiters_per_replset   = optional(number, 1)      # Number of arbiters per replica set
+  }))
 
-   default = {
-#     ig-rs01 = {
-#       env_tag = "test"
-#     }
-#     ig-rs02 = {
-#       env_tag = "prod"
-#     }
-   }
+  default = {
+    #     ig-rs01 = {
+    #       env_tag = "test"
+    #     }
+    #     ig-rs02 = {
+    #       env_tag = "prod"
+    #     }
+  }
 }
 
 variable "gce_ssh_users" {
   description = "SSH user names, and their public key files to be added to authorized_keys"
   default = {
     ivan_groenewold = "ivan.pub"
-#    ,user2 = "user2.pub"
+    #    ,user2 = "user2.pub"
   }
 }
 
 variable "my_ssh_user" {
-  default = "ivan_groenewold"
-  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"  
+  default     = "ivan_groenewold"
+  description = "Used to auto-generate the ssh_config file. Each person running this code should set it to its own SSH user name"
 }
 
 variable "enable_ssh_gateway" {
-  type = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Adds proxycommand lines with a gateway/jump host to the generated ssh_config file"
 }
 
 variable "ssh_gateway_name" {
-  type = string
-  default = "gateway"
+  type        = string
+  default     = "gateway"
   description = "Name of your jump host to use for ssh_config"
 }
 
 variable "port_to_forward" {
-  type = string
-  default = "23443"
+  type        = string
+  default     = "23443"
   description = "Local port number to forward via SSH to access PMM UI over localhost"
 }
 
@@ -103,21 +103,21 @@ locals {
 }
 
 variable "pmm_disk_type" {
-   default = "pd-ssd"
+  default = "pd-ssd"
 }
 
 variable "pmm_type" {
-  default = "e2-standard-2"
+  default     = "e2-standard-2"
   description = "instance type of the PMM server"
 }
 
 variable "pmm_volume_size" {
-  default = "100"
+  default     = "100"
   description = "storage size for the PMM server"
 }
 
 variable "pmm_port" {
-  type = number
+  type    = number
   default = 8443
 }
 
@@ -146,7 +146,7 @@ locals {
 }
 
 variable "backup_retention" {
-  default = "2"
+  default     = "2"
   description = "days to keep backups in bucket"
 }
 
@@ -162,12 +162,12 @@ variable "image" {
 
 # Save money by running spot instances but they may be terminated by google at any time
 variable "use_spot_instances" {
-  type = bool
+  type    = bool
   default = false
 }
 
 variable "data_disk_type" {
-  default = "pd-standard"
+  default     = "pd-standard"
   description = "GCP persistent disk type for MongoDB data disks (pd-standard, pd-ssd, pd-balanced)"
 }
 
@@ -235,7 +235,7 @@ locals {
 }
 
 variable "subnet_name" {
-  type = string
+  type    = string
   default = "mongo-subnet"
 }
 
@@ -276,4 +276,10 @@ variable "pbm_version" {
   type        = string
   default     = ""
   description = "Specific PBM version to install (e.g. 2.4.0). Empty string installs the latest available."
+}
+
+variable "pmm_client_version" {
+  type        = string
+  default     = ""
+  description = "Specific PMM client version to install (e.g. 3.4.0). Empty string installs the latest available."
 }

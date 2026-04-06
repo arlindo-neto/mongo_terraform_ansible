@@ -4,9 +4,9 @@ data "docker_registry_image" "ldap" {
 }
 
 resource "docker_image" "ldap" {
-  name         = var.ldap_image
+  name          = data.docker_registry_image.ldap.name
   pull_triggers = [data.docker_registry_image.ldap.sha256_digest]
-  keep_locally = true  
+  keep_locally  = true
 }
 
 # LDAP Server volume
@@ -28,7 +28,7 @@ resource "docker_container" "ldap_server" {
   ]
 
   volumes {
-    volume_name = docker_volume.ldap_data.name
+    volume_name    = docker_volume.ldap_data.name
     container_path = "/var/lib/ldap"
   }
 
@@ -45,9 +45,13 @@ resource "docker_container" "ldap_server" {
     interval = "10s"
     timeout  = "5s"
     retries  = 5
-  }  
-  wait = true       
-  restart = "on-failure"  
+  }
+  wait    = true
+  restart = "on-failure"
+
+  lifecycle {
+    replace_triggered_by = [docker_image.ldap]
+  }
 }
 
 # Creation of users
@@ -57,15 +61,15 @@ resource "null_resource" "ldap_users" {
   provisioner "local-exec" {
     command = <<EOT
       echo '${templatefile("${path.module}/ldap_user.ldif.tmpl", {
-        uid      = var.ldap_users[count.index].uid,
-        cn       = var.ldap_users[count.index].cn,
-        sn       = var.ldap_users[count.index].sn,
-        password = var.ldap_users[count.index].password,
-        dc_base  = replace(var.ldap_domain, ".", ",dc=")
-      })}' | docker exec -i ${var.ldap_server} ldapadd -x -D "cn=admin,dc=${replace(var.ldap_domain, ".", ",dc=")}" -w "${var.ldap_admin_password}"
+    uid      = var.ldap_users[count.index].uid,
+    cn       = var.ldap_users[count.index].cn,
+    sn       = var.ldap_users[count.index].sn,
+    password = var.ldap_users[count.index].password,
+    dc_base  = replace(var.ldap_domain, ".", ",dc=")
+})}' | docker exec -i ${var.ldap_server} ldapadd -x -D "cn=admin,dc=${replace(var.ldap_domain, ".", ",dc=")}" -w "${var.ldap_admin_password}"
     EOT
-  }
-  depends_on = [docker_container.ldap_server]
+}
+depends_on = [docker_container.ldap_server]
 }
 
 # Admin container image
@@ -74,9 +78,9 @@ data "docker_registry_image" "ldap_admin" {
 }
 
 resource "docker_image" "ldap_admin" {
-  name         = var.ldap_admin_image
+  name          = data.docker_registry_image.ldap_admin.name
   pull_triggers = [data.docker_registry_image.ldap_admin.sha256_digest]
-  keep_locally = true  
+  keep_locally  = true
 }
 
 # Admin interface
@@ -106,8 +110,12 @@ resource "docker_container" "phpldapadmin" {
     retries  = 5
   }
 
-  wait = true       
-  restart = "on-failure"  
+  wait    = true
+  restart = "on-failure"
+
+  lifecycle {
+    replace_triggered_by = [docker_image.ldap_admin]
+  }
 
   depends_on = [docker_container.ldap_server]
 }

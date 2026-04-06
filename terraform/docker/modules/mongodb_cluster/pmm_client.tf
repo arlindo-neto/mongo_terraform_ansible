@@ -3,7 +3,7 @@ data "docker_registry_image" "pmm_client" {
 }
 
 resource "docker_image" "pmm_client" {
-  name         = var.pmm_client_image
+  name          = data.docker_registry_image.pmm_client.name
   pull_triggers = [data.docker_registry_image.pmm_client.sha256_digest]
-  keep_locally = true
+  keep_locally  = true
 }

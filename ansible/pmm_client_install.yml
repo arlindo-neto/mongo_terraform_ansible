@@ -18,10 +18,28 @@
     - name: Enable PMM client repository
       shell: "/usr/bin/percona-release enable {{ pmm_client_repo }}"
 
-    - name: Install pmm-client package from repository
+    - name: Install pmm-client package from repository (latest)
       package:
         name: "{{ pmm_client_package }}"
         state: present
+      when: pmm_client_version is not defined or pmm_client_version == ''
+
+    - name: Install pmm-client packages from repository (specific version – Debian/Ubuntu)
+      apt:
+        name: "{{ pmm_client_package | map('regex_replace', '^pmm-client$', 'pmm-client=' ~ pmm_client_version ~ '*') | list }}"
+        state: present
+        allow_downgrade: true
+      when:
+        - pmm_client_version is defined and pmm_client_version != ''
+        - ansible_os_family == 'Debian'
+
+    - name: Install pmm-client packages from repository (specific version – RedHat)
+      yum:
+        name: "{{ pmm_client_package | map('regex_replace', '^pmm-client$', 'pmm-client-' ~ pmm_client_version) | list }}"
+        state: present
+      when:
+        - pmm_client_version is defined and pmm_client_version != ''
+        - ansible_os_family == 'RedHat'
 
     - name: Disable Percona telemetry
       systemd:

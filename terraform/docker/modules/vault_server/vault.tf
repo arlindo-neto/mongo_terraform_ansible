@@ -3,7 +3,7 @@ data "docker_registry_image" "vault" {
 }
 
 resource "docker_image" "vault" {
-  name          = var.vault_image
+  name          = data.docker_registry_image.vault.name
   pull_triggers = [data.docker_registry_image.vault.sha256_digest]
   keep_locally  = true
 }
@@ -14,7 +14,7 @@ resource "docker_volume" "vault_data" {
 
 resource "docker_container" "vault" {
   name  = var.vault_container_name
-  image = docker_image.vault.latest
+  image = docker_image.vault.image_id
   ports {
     internal = var.vault_port
     external = var.vault_port
@@ -28,6 +28,10 @@ resource "docker_container" "vault" {
     "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:${var.vault_port}"
   ]
   command = ["server", "-dev"]
+
+  lifecycle {
+    replace_triggered_by = [docker_image.vault]
+  }
 }
 
 # Provision Vault with PKI and KV secrets engines

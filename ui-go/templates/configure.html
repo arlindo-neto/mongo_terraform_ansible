@@ -962,6 +962,9 @@
     </div>
     <div id="pmm-cloud-body" {{if not $pmmCustomized}}style="display:none"{{end}}>
     <div id="pmm-cloud-settings" {{if not (boolDefault .Config.EnablePmm false)}}style="display:none"{{end}}>
+    {{$curPmm := .Config.PmmImage}}
+    {{$curPmmClientVer := .Config.PmmClientVersion}}
+    {{$isCustomPmm := and $curPmm (not (or (hasPrefix $curPmm "docker.io/percona/pmm-server:") (hasPrefix $curPmm "percona/pmm-server:")))}}
     {{if eq $p "chaos"}}
     <div class="form-row">
       <div class="form-group">
@@ -999,6 +1002,36 @@
                value="{{intDefault .Config.PmmPort 8443}}">
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>PMM Server Image (Ansible) <span class="field-tip" data-tip="Docker image used by Ansible to provision the PMM server.">ⓘ</span></label>
+        <div class="image-select-wrapper">
+          <select name="pmm_image" onchange="toggleCustomImageInput(this)">
+            {{range .PMMImages}}
+            <option value="docker.io/percona/pmm-server:{{.}}"
+                    {{if tagSelected $curPmm "docker.io/percona/pmm-server" .}}selected{{end}}>
+              docker.io/percona/pmm-server:{{.}}
+            </option>
+            {{end}}
+            <option value="__custom__" {{if $isCustomPmm}}selected{{end}}>Custom…</option>
+          </select>
+          <input type="text" class="custom-image-input" name="pmm_image_custom"
+                 value="{{if $isCustomPmm}}{{$curPmm}}{{end}}"
+                 placeholder="registry/repo:tag"
+                 style="{{if $isCustomPmm}}display:block{{else}}display:none{{end}};margin-top:0.3rem"
+                 oninput="syncCustomImageOption(this)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="pmm_client_version">PMM Client Version <span class="field-tip" data-tip="Optional: pin to a specific PMM client package version for monitored nodes. Leave empty to install the latest available.">ⓘ</span></label>
+        <select id="pmm_client_version" name="pmm_client_version">
+          <option value="">latest (default)</option>
+          {{range .PMMClientImages}}
+          <option value="{{.}}" {{if eq $curPmmClientVer .}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
     {{else}}
     <div class="form-row">
       <div class="form-group">
@@ -1027,13 +1060,29 @@
       </div>
       <div class="form-group">
         <label>PMM Server Image (Ansible) <span class="field-tip" data-tip="Docker image used by Ansible to provision the PMM server.">ⓘ</span></label>
-        <select name="pmm_image">
-          {{$curPmm := .Config.PmmImage}}
-          {{range .PMMImages}}
-          <option value="docker.io/percona/pmm-server:{{.}}"
-                  {{if tagSelected $curPmm "docker.io/percona/pmm-server" .}}selected{{end}}>
-            docker.io/percona/pmm-server:{{.}}
-          </option>
+        <div class="image-select-wrapper">
+          <select name="pmm_image" onchange="toggleCustomImageInput(this)">
+            {{range .PMMImages}}
+            <option value="docker.io/percona/pmm-server:{{.}}"
+                    {{if tagSelected $curPmm "docker.io/percona/pmm-server" .}}selected{{end}}>
+              docker.io/percona/pmm-server:{{.}}
+            </option>
+            {{end}}
+            <option value="__custom__" {{if $isCustomPmm}}selected{{end}}>Custom…</option>
+          </select>
+          <input type="text" class="custom-image-input" name="pmm_image_custom"
+                 value="{{if $isCustomPmm}}{{$curPmm}}{{end}}"
+                 placeholder="registry/repo:tag"
+                 style="{{if $isCustomPmm}}display:block{{else}}display:none{{end}};margin-top:0.3rem"
+                 oninput="syncCustomImageOption(this)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="pmm_client_version">PMM Client Version <span class="field-tip" data-tip="Optional: pin to a specific PMM client package version for monitored nodes. Leave empty to install the latest available.">ⓘ</span></label>
+        <select id="pmm_client_version" name="pmm_client_version">
+          <option value="">latest (default)</option>
+          {{range .PMMClientImages}}
+          <option value="{{.}}" {{if eq $curPmmClientVer .}}selected{{end}}>{{.}}</option>
           {{end}}
         </select>
       </div>
@@ -2495,7 +2544,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
 
   // Simple scalar fields
   const simpleFields = [
-    'prefix','mongo_release','mongo_version','pbm_version','project_id','region','location',
+    'prefix','mongo_release','mongo_version','pbm_version','pmm_client_version','project_id','region','location',
     'subnet_cidr','subnet_count','source_ranges',
     'my_ssh_user','ssh_public_key_path','default_key_pair','default_vpc_name',
     'enable_ssh_gateway','ssh_gateway_name','port_to_forward',
@@ -2531,6 +2580,10 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   if (config.machine_image === '__custom__') {
     const customVal = (fd.get('machine_image_custom') || '').trim();
     config.machine_image = customVal;
+  }
+  if (config.pmm_image === '__custom__') {
+    const customVal = (fd.get('pmm_image_custom') || '').trim();
+    config.pmm_image = customVal;
   }
   config.use_spot_instances = fd.has('use_spot_instances');
   if (PLATFORM !== 'docker') {

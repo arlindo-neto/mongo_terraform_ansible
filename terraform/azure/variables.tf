@@ -15,13 +15,13 @@ variable "prefix" {
 variable "clusters" {
   description = "MongoDB clusters to deploy"
   type = map(object({
-    env_tag               = optional(string, "test")
-    configsvr_count       = optional(number, 3)
-    shard_count           = optional(number, 2)
-    shardsvr_replicas     = optional(number, 2)
-    arbiters_per_replset  = optional(number, 1)
-    mongos_count          = optional(number, 2)
-    bind_to_localhost     = optional(bool, false)
+    env_tag              = optional(string, "test")
+    configsvr_count      = optional(number, 3)
+    shard_count          = optional(number, 2)
+    shardsvr_replicas    = optional(number, 2)
+    arbiters_per_replset = optional(number, 1)
+    mongos_count         = optional(number, 2)
+    bind_to_localhost    = optional(bool, false)
   }))
   default = {
     ig-cl01 = {
@@ -33,15 +33,15 @@ variable "clusters" {
 variable "replsets" {
   description = "MongoDB replica sets to deploy"
   type = map(object({
-    env_tag               = optional(string, "test")
+    env_tag                = optional(string, "test")
     data_nodes_per_replset = optional(number, 2)
     arbiters_per_replset   = optional(number, 1)
     bind_to_localhost      = optional(bool, false)
   }))
   default = {
-#     ig-rs01 = {
-#     env_tag = "test"
-#     }
+    #     ig-rs01 = {
+    #     env_tag = "test"
+    #     }
   }
 }
 
@@ -130,7 +130,7 @@ variable "default_bucket_name" {
 }
 
 locals {
-  bucket_name = "${var.prefix}${var.default_bucket_name}"
+  bucket_name      = "${var.prefix}${var.default_bucket_name}"
   storage_endpoint = "https://${local.bucket_name}.blob.core.windows.net"
 }
 
@@ -165,7 +165,7 @@ variable "use_spot_instances" {
 }
 
 variable "data_disk_type" {
-  default = "Standard_LRS"
+  default     = "Standard_LRS"
   description = "Azure managed disk type for MongoDB data disks (Standard_LRS, Premium_LRS, StandardSSD_LRS, UltraSSD_LRS)"
 }
 
@@ -281,4 +281,10 @@ variable "pbm_version" {
   type        = string
   default     = ""
   description = "Specific PBM version to install (e.g. 2.4.0). Empty string installs the latest available."
+}
+
+variable "pmm_client_version" {
+  type        = string
+  default     = ""
+  description = "Specific PMM client version to install (e.g. 3.4.0). Empty string installs the latest available."
 }

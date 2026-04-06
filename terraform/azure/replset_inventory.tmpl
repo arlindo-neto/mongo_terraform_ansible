@@ -33,5 +33,8 @@ pbm_release=${pbm_release}
 %{ if pbm_version != "" ~}
 pbm_version=${pbm_version}
 %{ endif ~}
+%{ if pmm_client_version != "" ~}
+pmm_client_version=${pmm_client_version}
+%{ endif ~}
 env_tag=${env_tag}
 account=${account}
