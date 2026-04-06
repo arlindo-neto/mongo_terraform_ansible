@@ -1,4 +1,4 @@
-# MongoDB Deploy UI (Go)
+# PSMDB Sandbox
 
 A portable, zero-dependency web frontend for **mongo_terraform_ansible** written in Go.
 
@@ -8,16 +8,15 @@ A portable, zero-dependency web frontend for **mongo_terraform_ansible** written
 
 ### Environment list — multiple clusters at a glance
 
-![Environment list](https://github.com/user-attachments/assets/8e2ad36b-0a6d-4506-a6c8-0a33a0c55cc5)
+![Environment list](static/readme/environment-list.png)
 
-### Environment detail — Hosts & Connections panel (Docker example)
+### Environment detail — current management view
 
-After a successful deploy the **Hosts & Connections** panel appears automatically.
-It shows every container (or cloud VM) with its IP address, a one-click copy command
-(`docker exec` or `ssh`), ready-to-use MongoDB connection strings for every cluster
-and replica set, and **Open** buttons for the PMM and MinIO Console web UIs.
+The environment detail page shows the current status, primary actions,
+configuration summary, service links, and automatically loads the
+**Hosts & Connections** panel after infrastructure is available.
 
-![Hosts & Connections panel](https://github.com/user-attachments/assets/f4820ddd-c758-4cbd-ba54-1860433e4e9f)
+![Environment detail](static/readme/environment-detail.png)
 
 ---
 
@@ -153,7 +152,7 @@ Then open **http://127.0.0.1:5001** in your browser.
 
 ## How it works
 
-1. **Platform selection** – choose AWS, GCP, Azure, or Docker.
+1. **Platform selection** – choose AWS, GCP, Azure, CHAOS or Docker.
 2. **Configuration wizard** – fill in cluster topology, images/packages, credentials,
    networking, and (for cloud platforms) per-component instance types and disk sizes.
    - Image tags are fetched live from Docker Hub on startup and cached for 5 minutes.
