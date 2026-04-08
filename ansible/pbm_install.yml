@@ -109,6 +109,15 @@
   tags: backup
   become: true
   tasks:
+    - name: Validate NFS inventory when filesystem storage is enabled
+      ansible.builtin.assert:
+        that:
+          - "'nfs' in groups"
+          - "groups.get('nfs', []) | length > 0"
+        fail_msg: "storage_provider=filesystem requires an inventory group [nfs] with at least one host"
+      when: (storage_provider | default('filesystem')) == "filesystem"
+      run_once: true
+
     - name: Ensure mount directory exists
       ansible.builtin.file:
         path: "{{ pbm_path }}"
@@ -118,7 +127,7 @@
     - name: Add NFS mount entry to /etc/fstab and mount it
       ansible.posix.mount:
         path: "{{ pbm_path }}"
-        src: "{{ hostvars[groups['nfs'][0]]['ansible_facts']['default_ipv4']['address'] }}:{{ pbm_path }}"
+        src: "{{ hostvars[groups['nfs'][0]].ansible_host | default(hostvars[groups['nfs'][0]]['ansible_facts']['default_ipv4']['address']) }}:{{ pbm_path }}"
         fstype: nfs
         opts: rw
         dump: 0
