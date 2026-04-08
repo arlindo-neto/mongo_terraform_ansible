@@ -2,7 +2,55 @@
 
 A portable, zero-dependency web frontend for **mongo_terraform_ansible** written in Go.
 
----
+## Overview
+
+The UI lets you configure, deploy, stop, restart, reset, and destroy environments without
+editing `.tfvars` files manually. It writes Terraform variable files into the matching
+`terraform/<platform>/` directory and streams job output live in the browser.
+
+Supported platforms:
+
+- AWS
+- GCP
+- Azure
+- CHAOS
+- Docker
+
+## Requirements
+
+- **Go 1.22+**
+
+Optional, depending on the environment type you want to deploy:
+
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) 1.0+
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) for AWS, GCP, Azure, and CHAOS
+- [Docker](https://docs.docker.com/get-docker/) for Docker environments
+- Cloud CLI credentials configured in your environment (`aws`, `gcloud`, `az`, and so on)
+
+## Quick Start
+
+```bash
+cd ui-go
+go run .
+```
+
+Then open `http://127.0.0.1:5001` in your browser.
+
+To build a binary:
+
+```bash
+cd ui-go
+go build -o mongodeploy .
+./mongodeploy
+```
+
+## Environment Variables
+
+| Variable      | Default           | Description                                                    |
+|---------------|-------------------|----------------------------------------------------------------|
+| `PORT`        | `5001`            | TCP port to listen on                                          |
+| `UI_HOST`     | `127.0.0.1`       | Bind address; use `0.0.0.0` to listen on all interfaces        |
+| `UI_BASE_DIR` | current directory | Override the base directory; must contain `templates/` and `static/` |
 
 ## Screenshots
 
@@ -107,49 +155,6 @@ stateDiagram-v2
 | **Deleted**               | all             | Record removed from the UI list.                                                                                  |
 | **\*\_Failed**            | all             | Any action may fail; the status becomes `<action>_failed`. Re-run the action to retry.                            |
 
----
-
-## Requirements
-
-- **Go 1.22+** (for `net/http` pattern-based routing with `{name}` params)
-
-Optional (needed to actually run deployments):
-
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) ≥ 1.0
-- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) (for AWS / GCP / Azure deployments)
-- [Docker](https://docs.docker.com/get-docker/) (for local Docker environments)
-- Cloud CLI credentials configured in your environment (AWS CLI, `gcloud`, `az`, etc.)
-
----
-
-## Quick Start
-
-```bash
-# From the repository root
-cd ui-go
-go run .
-```
-
-Or build a binary and run it from anywhere:
-
-```bash
-cd ui-go
-go build -o mongodeploy .
-./mongodeploy
-```
-
-Then open **http://127.0.0.1:5001** in your browser.
-
-### Environment variables
-
-| Variable       | Default           | Description                                                              |
-|----------------|-------------------|--------------------------------------------------------------------------|
-| `PORT`         | `5001`            | TCP port to listen on                                                    |
-| `UI_HOST`      | `127.0.0.1`       | Bind address (use `0.0.0.0` for all interfaces)                          |
-| `UI_BASE_DIR`  | current directory | Override the base directory (must contain `templates/` and `static/`)   |
-
----
-
 ## How it works
 
 1. **Platform selection** – choose AWS, GCP, Azure, CHAOS or Docker.
@@ -158,9 +163,9 @@ Then open **http://127.0.0.1:5001** in your browser.
     - Image tags are fetched live from Docker Hub on startup and cached for 5 minutes.
     - Percona package release identifiers (`psmdb-80`, …) are fetched from the Percona
       repository listing on startup.
-    - Each cluster and replica set includes audit plugin controls. Audit is enabled by
-      default and uses the built-in write-only filter for non-system users unless you
-      override it.
+    - Each cluster and replica set includes audit plugin controls. Audit is disabled by
+      default. Docker environments use the built-in write-only filter for non-system users
+      unless you override it.
 3. **Save** – writes `<env_id>.tfvars` inside the corresponding `../terraform/<platform>/`
    directory and records the environment in `environments.json`.
 4. **Deploy** – runs `terraform init && terraform apply` (and Ansible for cloud platforms)
@@ -176,8 +181,6 @@ Then open **http://127.0.0.1:5001** in your browser.
    every replica set and cluster, and clickable **Open** buttons for PMM and MinIO
    Console URLs.  All PMM-related containers (server, Grafana renderer, Watchtower,
    and per-node PMM client sidecars) are grouped together under a single **PMM** section.
-
----
 
 ## File structure
 
@@ -207,8 +210,6 @@ ui-go/
     ├── style.css
     └── app.js
 ```
-
----
 
 ## Security note
 

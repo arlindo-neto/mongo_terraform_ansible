@@ -1,21 +1,21 @@
-# Deploy MongoDB in Docker using Terraform
+# Deploy MongoDB on Docker with Terraform
 
-Deploys the full stack of Percona MongoDB software on Docker containers:
+This module deploys the full Percona MongoDB stack on Docker containers:
 
 - Percona Server for MongoDB
 - Percona Backup for MongoDB
 - PMM Client
 - PMM Server (with Grafana Renderer)
 
-In addition to this, the following resources are also created:
+It can also create:
 
 - MinIO server (with a storage bucket for PBM backups)
 - YCSB container (for generating workloads)
 - LDAP Server (optional for authentication)
 
-By default we deploy a sharded cluster (2 shards), where each shard is a 3-node PSA Replica Set running the latest versions of every component. 
+By default it deploys one sharded cluster with 2 shards. Each shard is a 3-node PSA replica set running the latest component versions.
 
-Additional clusters can be created by customizing the `clusters` variables by creating a `tfvars` file. Examples:
+Additional clusters can be defined in a `.tfvars` file. Example:
 
 ```
 clusters = {
@@ -50,7 +50,7 @@ minio_servers = {
 ldap_servers = {}
 ```
 
-By default, no stand-alone replica sets are created. If you want to provision any replica sets not part of a sharded cluster, create a `tfvars` file as follows:
+By default, no standalone replica sets are created. To provision one outside a sharded cluster, use a `.tfvars` file like this:
 
 ```
 clusters = {}
@@ -60,6 +60,7 @@ replsets = {
         env_tag      = "test"
         replset_port = 27020
         arbiter_port = 27027
+    }
 }
 
 pmm_servers = {
@@ -73,7 +74,7 @@ minio_servers = {
 ldap_servers = {}
 ```
 
-If you want just a replica set with no other components, you can use:
+If you want only a replica set with no PMM or PBM, use:
 ```
 clusters = {}
 
@@ -82,6 +83,7 @@ replsets = {
         env_tag      = "test"
         enable_pmm = false
         enable_pbm = false
+    }
 }
 
 pmm_servers = {}
@@ -91,10 +93,10 @@ minio_servers = {}
 ldap_servers = {}
 ```
 
-## Pre-requisites
+## Prerequisites
 
-- Terraform
-- Docker
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) 1.0+
+- [Docker](https://docs.docker.com/get-docker/)
 
 ### Mac
 
@@ -148,10 +150,10 @@ wsl --install -d  Ubuntu
   sudo apt update && sudo apt install terraform
   ```
 
-- Install [Docker Desltop on WSL](https://docs.docker.com/desktop/features/wsl/#turn-on-docker-desktop-wsl-2). Depending on which version of Windows you are using, Docker Desktop may prompt you to turn on WSL 2 during installation.
+- Install [Docker Desktop on WSL](https://docs.docker.com/desktop/features/wsl/#turn-on-docker-desktop-wsl-2). Depending on your Windows version, Docker Desktop may prompt you to enable WSL 2 during installation.
 
 
-## Initial Installation
+## Initial Setup
 
 1. Clone this repository to your machine
 
@@ -194,42 +196,60 @@ If no errors, proceed to the next section.
     ```
     Status should be `Up` and `healthy`.
 
-4. For a sharded cluster, connect to a mongos router to access it. For example:
+4. For a sharded cluster, connect to a `mongos` router. Example:
 
     ```
     docker exec -it cl01-mongos00 mongosh admin -u root -p percona
     sh.status()
     ```
 
-5. For a replica set, connect to any member to access it. For example:
+5. For a replica set, connect to any member. Example:
 
     ```
     docker exec -it rs01-svr0 mongosh admin -u root -p percona
     rs.status()
     ```
 
-- There is no need to run the Ansible playbook for this Docker-based deployments.
+- You do not need to run Ansible for Docker-based deployments.
+
+## Audit Plugin
+
+Both `clusters` and `replsets` support:
+
+- `enable_audit = false` by default
+- `audit_filter` with a built-in write-focused default filter for non-system users
+
+Example:
+
+```hcl
+replsets = {
+  rs01 = {
+    env_tag      = "test"
+    enable_audit = true
+  }
+}
+```
 
 ## PMM Monitoring
 
-- You can access the PMM Server by opening a web browser at https://127.0.0.1:8443. The default credentials are `admin/admin`.
+- Access PMM at `https://127.0.0.1:8443`. Default credentials: `admin/admin`.
 
-- Grafana renderer is installed and configured, in order to be able to export any PMM graphic as a PNG image.
+- Grafana renderer is installed so PMM graphs can be exported as PNG images.
 
 ## PBM Backup
 
-- A dedicated `pbm-cli` container is deployed where you can run PBM commands. Example:
+- A dedicated `pbm-cli` container is deployed for PBM commands. Example:
 
 ```
 docker exec -it cl01-pbm-cli pbm status
 ```
 
-- You can access the Minio Server web interface at http://127.0.0.1:9001 to inspect the backup storage/files. The default credentials are `minio/minioadmin`.
+- Access the MinIO web console at `http://127.0.0.1:9001`. Default credentials: `minio/minioadmin`.
 
 ## Simulating a workload with YCSB
 
-- When `enable_ycsb = true`, a dedicated YCSB container is created as part of the stack.
-- For sharded clusters, a sharded `ycsb.usertable` collection is automatically created with `{_id: hashed }` as the shard key. 
+- When `enable_ycsb = true`, a dedicated YCSB container is created.
+- For sharded clusters, a sharded `ycsb.usertable` collection is created automatically with `{_id: hashed}` as the shard key.
 
 - To run a YCSB workload:
 
@@ -253,9 +273,9 @@ docker exec -it cl01-pbm-cli pbm status
 
 ## LDAP
 
-- Connect to the LDAP management interface at http://127.0.0.1:8080 using `cn=admin,dc=example,dc=org`. Default password is `admin`
+- Access the LDAP management interface at `http://127.0.0.1:8080` with `cn=admin,dc=example,dc=org`. Default password: `admin`.
 
-- By default `example.org` organization is created. You can pre-create some LDAP users with Teerraform or use the management interface to do it manually.
+- By default, the `example.org` organization is created. You can pre-create users with Terraform or add them manually in the management UI.
 
 - Create the LDAP users in MongoDB and assign them a role. For example:
 
@@ -271,7 +291,7 @@ docker exec -it cl01-pbm-cli pbm status
 
 ## Cleanup
 
-- Run terraform to remove all the resources and start from scratch
+- Remove all resources and start over with:
 
   ```
   terraform destroy

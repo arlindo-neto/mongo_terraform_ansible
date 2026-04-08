@@ -1,17 +1,33 @@
-# Deploy MongoDB environments using Terraform/Ansible
+# Deploy MongoDB environments using Terraform and Ansible
 
-This automation framework deploys the full stack of Percona Software for MongoDB easily:
+This repository automates Percona software for MongoDB across cloud and local environments:
 
 - Percona Server for MongoDB (PSMDB)
 - Percona Backup for MongoDB (PBM)
-- Percona Monitoring & Management (PMM)
+- Percona Monitoring and Management (PMM)
 
-You can choose between:
+Supported deployment targets:
 
-- Creating all resources in a public cloud platform (AWS, GCP, Azure) or a private CHAOS
-  cluster, using a combination of Terraform and Ansible.
-- Run everything locally on a single server or your own laptop using Docker containers or
-  Libvirt/KVM virtual machines (Terraform only — Ansible is not required).
+- Public cloud: AWS, GCP, Azure
+- Private cloud: CHAOS
+- Local: Docker containers or Libvirt/KVM virtual machines
+
+Cloud and CHAOS deployments use Terraform for infrastructure and Ansible for software
+configuration. Docker and Libvirt deployments are Terraform-only.
+
+## Prerequisites
+
+Install the tools that match your target platform:
+
+- `git`
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) 1.0+
+- [Go 1.22+](https://go.dev/doc/install) if you want to use the Web UI
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/) for AWS, GCP, Azure, and CHAOS deployments
+- [Docker](https://docs.docker.com/get-docker/) for local Docker environments
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), or [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) for the corresponding cloud provider
+- KVM/Libvirt plus `genisoimage` for local Libvirt deployments
+
+You will also need provider credentials or login configured in your shell before running Terraform.
 
 ## Web UI (Recommended)
 
@@ -36,27 +52,6 @@ go run .
 
 See [`ui-go/README.md`](./ui-go/README.md) for full details.
 
-## Audit Plugin
-
-All deployment types support configuring the PSMDB audit plugin per sharded cluster and per replica set.
-
-- `enable_audit` is disabled by default
-- audited events are written to a file
-- the default `audit_filter` captures write operations for non-system users only
-
-In the Web UI, each cluster and replica set has Audit controls for enabling/disabling the plugin. The filter field only appears after audit is enabled.
-
-When editing `.tfvars` manually, set these fields inside each `clusters` or `replsets` entry:
-
-```hcl
-clusters = {
-  cl01 = {
-    enable_audit = false
-    audit_filter = "{ atype: \"authCheck\", \"param.command\": { $in: [ \"insert\", \"update\", \"delete\", \"findandmodify\" ] }, \"users.user\": { $not: /^__/ } }"
-  }
-}
-```
-
 ## Manual Instructions (without the Web UI)
 
 1. Clone this repository on your machine and `cd` to it
@@ -79,5 +74,26 @@ clusters = {
     - [CHAOS](./terraform/chaos/README.md)
     - [Local Docker containers](./terraform/docker/README.md)
     - [Local Libvirt/KVM virtual machines](./terraform/libvirt/README.md)
+
+## Audit Plugin
+
+All deployment types support the PSMDB audit plugin per sharded cluster and per standalone replica set.
+
+- `enable_audit` is `false` by default
+- audit events are written to a file
+- Docker uses a built-in default `audit_filter`; cloud and CHAOS modules accept an optional custom filter
+
+In the Web UI, each cluster and replica set has audit controls. The filter field appears only after audit is enabled.
+
+When editing `.tfvars` manually, set these fields inside each `clusters` or `replsets` entry:
+
+```hcl
+clusters = {
+  cl01 = {
+    enable_audit = true
+    audit_filter = "{ atype: \"authCheck\", \"param.command\": { $in: [ \"insert\", \"update\", \"delete\", \"findandmodify\" ] }, \"users.user\": { $not: /^__/ } }"
+  }
+}
+```
 
 ## Disclaimer: This code is not supported by Percona. It has been provided solely as a community-contributed example and is not covered under any Percona services agreement.

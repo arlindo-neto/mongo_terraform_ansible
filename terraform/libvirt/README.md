@@ -1,6 +1,6 @@
 # Deploy VMs using Terraform with Libvirt/KVM
 
-Creates the following resources:
+This module creates:
 
 - Libvirt Storage Pool
 - OS Images and Resized Disk Volumes
@@ -8,7 +8,7 @@ Creates the following resources:
 - Private Network (NAT mode)
 - KVM Domains (VMs)
 
-## Pre-requisites
+## Prerequisites
 
 ### 1. Install KVM/Libvirt
 
@@ -50,9 +50,8 @@ sudo usermod -aG libvirt $USER
 
 ## Quick Guide
 
-1. **Clone the repository:**
+1. **Change into this directory:**
    ```bash
-   git clone <repo-url>
    cd mongo_terraform_ansible/terraform/libvirt
    ```
 
@@ -83,7 +82,7 @@ sudo usermod -aG libvirt $USER
    tofu init
    ```
 
-5. **Review and Apply:**
+5. **Review and apply:**
    Check `variables.tf` and adjust if needed, then deploy:
    ```bash
    terraform apply
@@ -112,6 +111,11 @@ Edit `variables.tf` to customize your deployment:
 - **source_vm**: Path to the source qcow2 image relative to the module root (default: `sources/rocky9.qcow2`).
 - **interface**: Host network interface to bridge/nat (default: `ens01`).
 
+## Notes
+
+- This module provisions only virtual machines and base access. It does not run the Ansible MongoDB deployment automatically.
+- After the VMs are reachable, use the playbooks in [`../../ansible`](../../ansible) if you want the full MongoDB software stack installed.
+
 ## Shutdown VMs
 
 To shutdown the VMs using Terraform/OpenTofu:
@@ -125,5 +129,4 @@ tofu apply -var 'vm_condition_poweron=false'
 ## Credits
 
 This project makes extensive use of the excellent [terraform-provider-libvirt](https://github.com/dmacvicar/terraform-provider-libvirt). Special thanks to the maintainers for allowing us to manage KVM/Libvirt resources with Terraform.
-
 
