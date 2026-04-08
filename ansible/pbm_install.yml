@@ -102,7 +102,7 @@
     - name: Collect minimal facts (if overall gather_facts disabled earlier)
       ansible.builtin.setup:
         filter: ansible_default_ipv4
-      when: storage_provider == "filesystem"
+      when: (storage_provider | default('filesystem')) == "filesystem"
 
 - name: Configure NFS clients if needed
   hosts: cfg:shards:replsets
@@ -113,7 +113,7 @@
       ansible.builtin.file:
         path: "{{ pbm_path }}"
         state: directory
-      when: storage_provider == "filesystem"
+      when: (storage_provider | default('filesystem')) == "filesystem"
 
     - name: Add NFS mount entry to /etc/fstab and mount it
       ansible.posix.mount:
@@ -124,7 +124,7 @@
         dump: 0
         passno: 0
         state: mounted
-      when: storage_provider == "filesystem"
+      when: (storage_provider | default('filesystem')) == "filesystem"
 
 - name: Configure backup process
   hosts: cfg:replsets

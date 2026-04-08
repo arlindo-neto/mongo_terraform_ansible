@@ -122,8 +122,7 @@
             src: /etc/vault.d/vault.crt
             dest: ./vault.crt
             flat: yes
-          delegate_to: "{{ groups['pmm'][0] }}"
-          when: groups['pmm'] | default([]) | length > 0          
+          delegate_to: "{{ (groups['pmm'] | default([])) | first | default(inventory_hostname) }}"
           run_once: true
 
         - name: Copy vault certificate to MongoDB hosts
@@ -141,7 +140,7 @@
             src: /tmp/mongo_token.txt
             dest: ./mongo_token.txt
             flat: yes
-          delegate_to: "{{ (groups['pmm'] | default([]))[0] }}"
+          delegate_to: "{{ (groups['pmm'] | default([])) | first | default(inventory_hostname) }}"
           run_once: true
 
         - name: Copy token file to MongoDB hosts

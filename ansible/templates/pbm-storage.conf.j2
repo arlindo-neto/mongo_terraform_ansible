@@ -1,23 +1,23 @@
 storage:
-  type: {{ storage_provider }}
-{% if storage_provider == "filesystem" %}
+  type: {{ storage_provider | default('filesystem') }}
+{% if (storage_provider | default('filesystem')) == "filesystem" %}
   filesystem:
     path: {{ pbm_path }}
-{% elif storage_provider == "gcs" %}
+{% elif (storage_provider | default('filesystem')) == "gcs" %}
   gcs:
     bucket: {{ bucket }}
     prefix: {{ prefix | default(cluster) | default(group_names[0]) }}
     credentials:
       hmacAccessKey: {{ access_key_id }}
       hmacSecret: {{ secret_access_key }}
-{% elif storage_provider == "azure" %}
+{% elif (storage_provider | default('filesystem')) == "azure" %}
   azure:
     account: {{ account }}
     container: {{ bucket }}
     prefix: {{ prefix | default(cluster) | default(group_names[0]) }}
     credentials:
       key: {{ key }}
-{% elif storage_provider == "minio" %}
+{% elif (storage_provider | default('filesystem')) == "minio" %}
   minio:
     endpoint: {{ endpointUrl | replace('http://', '') | replace('https://', '') }}
     bucket: {{ bucket }}
@@ -25,7 +25,7 @@ storage:
     credentials:
       access-key-id: {{ access_key_id }}
       secret-access-key: {{ secret_access_key }}
-{% elif storage_provider == "s3" %}
+{% elif (storage_provider | default('filesystem')) == "s3" %}
   s3:
     region: {{ region }}
     bucket: {{ bucket }}
