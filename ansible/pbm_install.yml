@@ -94,46 +94,14 @@
         dest: "{{ pbm_config_path }}"
       when: arbiter is not defined
 
-- name: Gather facts of NFS server if needed
-  hosts: nfs
-  gather_facts: yes
-  tags: backup
-  tasks:
-    - name: Collect minimal facts (if overall gather_facts disabled earlier)
-      ansible.builtin.setup:
-        filter: ansible_default_ipv4
-      when: (storage_provider | default('filesystem')) == "filesystem"
-
 - name: Configure NFS clients if needed
   hosts: cfg:shards:replsets
   tags: backup
   become: true
   tasks:
-    - name: Validate NFS inventory when filesystem storage is enabled
-      ansible.builtin.assert:
-        that:
-          - "'nfs' in groups"
-          - "groups.get('nfs', []) | length > 0"
-        fail_msg: "storage_provider=filesystem requires an inventory group [nfs] with at least one host"
-      when: (storage_provider | default('filesystem')) == "filesystem"
-      run_once: true
-
-    - name: Ensure mount directory exists
-      ansible.builtin.file:
-        path: "{{ pbm_path }}"
-        state: directory
-      when: (storage_provider | default('filesystem')) == "filesystem"
-
-    - name: Add NFS mount entry to /etc/fstab and mount it
-      ansible.posix.mount:
-        path: "{{ pbm_path }}"
-        src: "{{ hostvars[groups['nfs'][0]].ansible_host | default(hostvars[groups['nfs'][0]]['ansible_facts']['default_ipv4']['address']) }}:{{ pbm_path }}"
-        fstype: nfs
-        opts: rw
-        dump: 0
-        passno: 0
-        state: mounted
-      when: (storage_provider | default('filesystem')) == "filesystem"
+    - name: Configure filesystem-backed PBM storage
+      ansible.builtin.include_tasks: pbm_nfs.yml
+      when: (storage_provider | default('')) == "filesystem"
 
 - name: Configure backup process
   hosts: cfg:replsets
