@@ -75,25 +75,4 @@ See [`ui-go/README.md`](./ui-go/README.md) for full details.
     - [Local Docker containers](./terraform/docker/README.md)
     - [Local Libvirt/KVM virtual machines](./terraform/libvirt/README.md)
 
-## Audit Plugin
-
-All deployment types support the PSMDB audit plugin per sharded cluster and per standalone replica set.
-
-- `enable_audit` is `false` by default
-- audit events are written to a file
-- Docker uses a built-in default `audit_filter`; cloud and CHAOS modules accept an optional custom filter
-
-In the Web UI, each cluster and replica set has audit controls. The filter field appears only after audit is enabled.
-
-When editing `.tfvars` manually, set these fields inside each `clusters` or `replsets` entry:
-
-```hcl
-clusters = {
-  cl01 = {
-    enable_audit = true
-    audit_filter = "{ atype: \"authCheck\", \"param.command\": { $in: [ \"insert\", \"update\", \"delete\", \"findandmodify\" ] }, \"users.user\": { $not: /^__/ } }"
-  }
-}
-```
-
 ## Disclaimer: This code is not supported by Percona. It has been provided solely as a community-contributed example and is not covered under any Percona services agreement.
