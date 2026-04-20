@@ -3,6 +3,7 @@
 <div class="page-header">
   <h1>Environments</h1>
   <div class="page-header-actions">
+    <button class="btn btn-outline" type="button" onclick="openPlatformSettings()">Settings</button>
     {{if .HasDeleted}}
     <button class="btn btn-outline btn-danger-outline" onclick="cleanupDeleted()"
             title="Remove all destroyed environments from the list">🧹 Cleanup Deleted</button>
@@ -68,4 +69,62 @@
   <a href="/new" class="btn btn-primary">Create Environment</a>
 </div>
 {{end}}
+
+<div class="modal-backdrop" id="platform-settings-modal" style="display:none">
+  <div class="modal settings-modal">
+    <div class="modal-header">
+      <h2>Advanced Settings</h2>
+    </div>
+    <p>Choose which platforms are available on the platform selection page.</p>
+    <form id="platform-settings-form" class="settings-form">
+      <label class="settings-checkbox">
+        <input type="checkbox" name="platform" value="aws">
+        <span>AWS</span>
+      </label>
+      <label class="settings-checkbox">
+        <input type="checkbox" name="platform" value="gcp">
+        <span>GCP</span>
+      </label>
+      <label class="settings-checkbox">
+        <input type="checkbox" name="platform" value="azure">
+        <span>Azure</span>
+      </label>
+      <label class="settings-checkbox">
+        <input type="checkbox" name="platform" value="chaos">
+        <span>CHAOS</span>
+      </label>
+      <label class="settings-checkbox">
+        <input type="checkbox" name="platform" value="docker">
+        <span>Docker</span>
+      </label>
+    </form>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" onclick="savePlatformSettingsFromForm()">Save</button>
+      <button type="button" class="btn btn-outline" onclick="closePlatformSettings()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openPlatformSettings() {
+  const settings = getPlatformSettings();
+  document.querySelectorAll('#platform-settings-form input[name="platform"]').forEach(input => {
+    input.checked = !!settings[input.value];
+  });
+  document.getElementById('platform-settings-modal').style.display = 'flex';
+}
+
+function closePlatformSettings() {
+  document.getElementById('platform-settings-modal').style.display = 'none';
+}
+
+function savePlatformSettingsFromForm() {
+  const settings = { ...DEFAULT_PLATFORM_SETTINGS };
+  document.querySelectorAll('#platform-settings-form input[name="platform"]').forEach(input => {
+    settings[input.value] = input.checked;
+  });
+  savePlatformSettings(settings);
+  closePlatformSettings();
+}
+</script>
 {{end}}

@@ -626,6 +626,37 @@ tr:last-child td { border-bottom: none; }
 .modal p  { color: var(--color-muted); margin-bottom: 1.5rem; }
 .modal-actions { display: flex; gap: 0.8rem; }
 
+.settings-modal {
+  max-width: 480px;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  cursor: pointer;
+}
+
+.settings-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.settings-checkbox span {
+  font-weight: 500;
+}
+
 /* ─── Wide modal (tfvars preview) ───────────────────────────────── */
 .modal-wide {
   max-width: 780px;

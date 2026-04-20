@@ -1,5 +1,41 @@
 // app.js – shared utilities for MongoDB Deploy UI
 
+const PLATFORM_SETTINGS_KEY = 'psmdbSandbox.platformSettings';
+const DEFAULT_PLATFORM_SETTINGS = Object.freeze({
+  aws: true,
+  gcp: true,
+  azure: true,
+  chaos: false,
+  docker: true,
+});
+
+function getPlatformSettings() {
+  try {
+    const raw = localStorage.getItem(PLATFORM_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_PLATFORM_SETTINGS };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_PLATFORM_SETTINGS,
+      ...(parsed && typeof parsed === 'object' ? parsed : {}),
+    };
+  } catch (_) {
+    return { ...DEFAULT_PLATFORM_SETTINGS };
+  }
+}
+
+function savePlatformSettings(settings) {
+  const merged = {
+    ...DEFAULT_PLATFORM_SETTINGS,
+    ...(settings && typeof settings === 'object' ? settings : {}),
+  };
+  localStorage.setItem(PLATFORM_SETTINGS_KEY, JSON.stringify(merged));
+  return merged;
+}
+
+function isPlatformEnabled(platform) {
+  return !!getPlatformSettings()[platform];
+}
+
 /**
  * Generic helper to fetch a URL and return parsed JSON response.
  * Handles non-JSON responses gracefully so callers always get a meaningful

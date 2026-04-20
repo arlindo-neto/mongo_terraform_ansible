@@ -4,12 +4,14 @@
   <div>
     <a href="/" class="back-link">← Environments</a>
     <h1>Choose a Platform</h1>
+    <p class="subtitle">Only platforms enabled in Settings are shown here.</p>
   </div>
 </div>
 
 <div class="platform-grid">
   {{range .Platforms}}
   <a href="/configure/{{.}}" class="platform-card platform-card-{{.}}"
+     data-platform="{{.}}"
      onclick="return checkPrereqs(event, '{{.}}')">
     <div class="platform-icon">
       {{if eq . "aws"}}☁️{{else if eq . "gcp"}}🌐{{else if eq . "azure"}}🔷{{else if eq . "chaos"}}⚡{{else}}🐳{{end}}
@@ -20,6 +22,11 @@
     </div>
   </a>
   {{end}}
+</div>
+
+<div id="no-enabled-platforms" class="empty-state" style="display:none; padding:2rem 1rem;">
+  <h2>No platforms enabled</h2>
+  <p>Go back to the main page and enable at least one platform in Settings.</p>
 </div>
 
 <div class="form-actions" style="margin-top:2rem">
@@ -97,7 +104,24 @@
 <script>
 let prereqTargetHref = '';
 
+function applyPlatformVisibility() {
+  const settings = getPlatformSettings();
+  let visibleCount = 0;
+  document.querySelectorAll('.platform-card[data-platform]').forEach(card => {
+    const enabled = !!settings[card.dataset.platform];
+    card.style.display = enabled ? '' : 'none';
+    if (enabled) visibleCount += 1;
+  });
+  document.getElementById('no-enabled-platforms').style.display = visibleCount === 0 ? 'block' : 'none';
+}
+
+applyPlatformVisibility();
+
 function checkPrereqs(event, platform) {
+  if (!isPlatformEnabled(platform)) {
+    event.preventDefault();
+    return false;
+  }
   event.preventDefault();
   prereqTargetHref = '/configure/' + platform;
   const modal = document.getElementById('prereq-modal');
