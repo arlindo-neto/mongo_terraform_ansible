@@ -311,17 +311,18 @@
     <h2>CHAOS Settings</h2>
     <div class="form-row">
       <div class="form-group form-group-full">
-        <label for="chaos_api_token">CHAOS API Token <span class="field-tip" data-tip="CHAOS API token required to create resources. Paste it directly or select a token file from disk.">ⓘ</span></label>
+        <label for="chaos_api_token_path">CHAOS API Token File <span class="field-tip" data-tip="Path to a file containing the CHAOS API token. The token itself is not stored in environments.json.">ⓘ</span></label>
         <div style="display:flex;gap:0.5rem;align-items:center">
-          <input type="password" id="chaos_api_token" name="chaos_api_token"
-                 value="{{.Config.ChaosApiToken}}" autocomplete="new-password"
-                 placeholder="Paste token or use Browse to load from file" style="flex:1">
+          <input type="text" id="chaos_api_token_path" name="chaos_api_token_path"
+                 value="{{.Config.ChaosApiTokenPath}}"
+                 placeholder="/path/to/chaos-token.txt" style="flex:1">
           <label class="btn btn-outline btn-sm" style="cursor:pointer;white-space:nowrap;margin:0">
             Browse&hellip;
             <input type="file" id="chaos_token_file" style="display:none"
-                   onchange="loadChaosTokenFromFile(this)">
+                   onchange="setChaosTokenFilePath(this)">
           </label>
         </div>
+        <small id="chaos_token_filename" class="text-muted">{{if .Config.ChaosApiTokenPath}}Stored token file: {{.Config.ChaosApiTokenPath}}{{else}}Upload a token file or enter a readable path on the UI host.{{end}}</small>
 
       </div>
     </div>
@@ -1700,14 +1701,27 @@ function toggleComputeBlock(btn) {
   btn.textContent = hidden ? '▲ Collapse' : '▼ Customize';
 }
 
-function loadChaosTokenFromFile(input) {
+async function setChaosTokenFilePath(input) {
   const file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('chaos_api_token').value = e.target.result.trim();
-  };
-  reader.readAsText(file);
+  const envIdField = document.getElementById('env_id_field');
+  const body = new FormData();
+  body.append('chaos_token_file', file);
+  if (envIdField && envIdField.value.trim()) {
+    body.append('env_id', envIdField.value.trim());
+  }
+  try {
+    const resp = await fetch('/api/upload-chaos-token', { method: 'POST', body });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Upload failed');
+    document.getElementById('chaos_api_token_path').value = data.path || '';
+    const label = document.getElementById('chaos_token_filename');
+    if (label) label.textContent = `Stored token file: ${data.path}`;
+  } catch (err) {
+    alert('Could not upload CHAOS token file: ' + err.message);
+  } finally {
+    input.value = '';
+  }
 }
 
 // Toggle the Minio VM body and Customize button when enable_minio checkbox changes.
@@ -2640,17 +2654,17 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   const submitBtn = form.querySelector('[type=submit]');
   const fd = new FormData(form);
 
-  // Validate mandatory CHAOS API token before doing anything else.
+  // Validate mandatory CHAOS API token file path before doing anything else.
   if (PLATFORM === 'chaos') {
-    const token = (fd.get('chaos_api_token') || '').trim();
-    if (!token) {
-      const tokenInput = document.getElementById('chaos_api_token');
+    const tokenPath = (fd.get('chaos_api_token_path') || '').trim();
+    if (!tokenPath) {
+      const tokenInput = document.getElementById('chaos_api_token_path');
       if (tokenInput) {
         tokenInput.focus();
         tokenInput.style.outline = '2px solid red';
         setTimeout(() => { tokenInput.style.outline = ''; }, 3000);
       }
-      alert('CHAOS API Token is required. Please paste your token or load it from a file.');
+      alert('CHAOS API token file path is required. Please provide the path to your token file.');
       return;
     }
   }
@@ -2673,7 +2687,7 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
     'mongos_type','arbiter_type',
     'replsetsvr_type','replsetsvr_volume_size',
     // CHAOS-specific fields
-    'chaos_api_token',
+    'chaos_api_token_path',
     'delete_after_days','os_image',
     'shardsvr_cpu_cores','shardsvr_memory_gb',
     'configsvr_cpu_cores','configsvr_memory_gb',

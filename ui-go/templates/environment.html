@@ -148,7 +148,7 @@
           {{if $.YcsbEnabled}}
           <td>
             <div class="action-buttons ycsb-actions" data-ycsb-kind="cluster" data-ycsb-target="{{.Name}}" style="gap:.35rem; flex-wrap:wrap">
-              <button class="btn btn-outline btn-xs ycsb-load-btn" onclick="runYcsbAction('cluster', {{json .Name}}, 'load')" title="{{if $.YcsbAvailable}}Perform the initial YCSB data load for this cluster{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Load Data</button>
+              <button class="btn btn-outline btn-xs ycsb-load-btn" onclick="runYcsbAction('cluster', {{json .Name}}, 'load')" title="{{if $.YcsbAvailable}}Insert the initial YCSB dataset for this cluster{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Insert Data</button>
               <button class="btn btn-outline btn-xs ycsb-start-btn" onclick="runYcsbAction('cluster', {{json .Name}}, 'start')" title="{{if $.YcsbAvailable}}Start YCSB workload generation for this cluster{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Start Load</button>
               <button class="btn btn-outline btn-xs ycsb-stop-btn" onclick="runYcsbAction('cluster', {{json .Name}}, 'stop')" title="Stop the running YCSB workload for this cluster" disabled>Stop Load</button>
             </div>
@@ -179,7 +179,7 @@
           {{if $.YcsbEnabled}}
           <td>
             <div class="action-buttons ycsb-actions" data-ycsb-kind="replset" data-ycsb-target="{{.Name}}" style="gap:.35rem; flex-wrap:wrap">
-              <button class="btn btn-outline btn-xs ycsb-load-btn" onclick="runYcsbAction('replset', {{json .Name}}, 'load')" title="{{if $.YcsbAvailable}}Perform the initial YCSB data load for this replica set{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Load Data</button>
+              <button class="btn btn-outline btn-xs ycsb-load-btn" onclick="runYcsbAction('replset', {{json .Name}}, 'load')" title="{{if $.YcsbAvailable}}Insert the initial YCSB dataset for this replica set{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Insert Data</button>
               <button class="btn btn-outline btn-xs ycsb-start-btn" onclick="runYcsbAction('replset', {{json .Name}}, 'start')" title="{{if $.YcsbAvailable}}Start YCSB workload generation for this replica set{{else}}Provision or start the environment before using YCSB{{end}}" {{if not $.YcsbAvailable}}disabled{{end}}>Start Load</button>
               <button class="btn btn-outline btn-xs ycsb-stop-btn" onclick="runYcsbAction('replset', {{json .Name}}, 'stop')" title="Stop the running YCSB workload for this replica set" disabled>Stop Load</button>
             </div>
@@ -700,7 +700,7 @@ function setProgressLabel(action) {
   const labels = {
     deploy: 'Deploying', provision: 'Provisioning', configure: 'Installing',
     restart: 'Restarting', stop: 'Stopping', reset: 'Resetting', destroy: 'Destroying',
-    ycsb_load: 'Loading YCSB data', ycsb_start: 'Starting YCSB load', ycsb_stop: 'Stopping YCSB load',
+    ycsb_load: 'Inserting YCSB data', ycsb_start: 'Starting YCSB load', ycsb_stop: 'Stopping YCSB load',
   };
   lbl.textContent = action ? `${labels[action] || ('Running: ' + action)}…` : 'Running…';
 }
@@ -770,6 +770,10 @@ function setStatus(status) {
   label.textContent = overrides[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function isYcsbAvailable() {
+  return currentStatus !== 'configured';
+}
+
 function getStatusBadgeClass(status) {
   if (status === 'success' || status.includes('success')) return 'badge-success';
   if (status.startsWith('fail') || status === 'error' || status.includes('failed')) return 'badge-danger';
@@ -825,14 +829,15 @@ function setYcsbButtonState(kind, target, running) {
   const selector = `.ycsb-actions[data-ycsb-kind="${CSS.escape(kind)}"][data-ycsb-target="${CSS.escape(target)}"]`;
   const container = document.querySelector(selector);
   if (!container) return;
+  const available = isYcsbAvailable();
   const loadBtn = container.querySelector('.ycsb-load-btn');
   const startBtn = container.querySelector('.ycsb-start-btn');
   const stopBtn = container.querySelector('.ycsb-stop-btn');
   if (loadBtn) {
-    loadBtn.disabled = !!running;
+    loadBtn.disabled = !available || !!running;
   }
   if (startBtn) {
-    startBtn.disabled = !!running;
+    startBtn.disabled = !available || !!running;
     startBtn.textContent = running ? 'Load Running' : 'Start Load';
     startBtn.classList.toggle('btn-secondary', !!running);
   }
@@ -842,6 +847,12 @@ function setYcsbButtonState(kind, target, running) {
 }
 
 async function refreshYcsbStatus() {
+  if (!isYcsbAvailable()) {
+    document.querySelectorAll('.ycsb-actions').forEach(container => {
+      setYcsbButtonState(container.dataset.ycsbKind, container.dataset.ycsbTarget, false);
+    });
+    return;
+  }
   try {
     const data = await apiFetch(`/api/environment/${ENV_ID}/ycsb/status`);
     const running = data.running || {};
@@ -858,6 +869,21 @@ async function refreshYcsbStatus() {
 
 // Current status tracked client-side so we can gate confirmations.
 let currentStatus = {{json .Env.Status}};
+let ycsbStatusPollTimer = null;
+
+function startYcsbStatusPolling() {
+  stopYcsbStatusPolling();
+  ycsbStatusPollTimer = setInterval(() => {
+    refreshYcsbStatus();
+  }, 5000);
+}
+
+function stopYcsbStatusPolling() {
+  if (ycsbStatusPollTimer !== null) {
+    clearInterval(ycsbStatusPollTimer);
+    ycsbStatusPollTimer = null;
+  }
+}
 
 // Actions that require confirmation when environment is already running.
 const CONFIRM_ACTIONS = new Set(['deploy', 'provision', 'configure']);
@@ -967,14 +993,14 @@ async function runYcsbAction(kind, target, action) {
     activeEventSource = es;
     currentJobId = data.job_id;
     es.addEventListener('message', ev => appendToTerminal(JSON.parse(ev.data)));
-    es.addEventListener('done', ev => {
+    es.addEventListener('done', async ev => {
       const s = JSON.parse(ev.data);
       setJobBadge(s);
       appendToTerminal(`\n✔ Job finished: ${s}`);
       es.close(); activeEventSource = null; setButtonsDisabled(false);
       hideProgressIndicator();
-      refreshEnvStatus();
-      refreshYcsbStatus();
+      await refreshEnvStatus();
+      await refreshYcsbStatus();
       loadHosts();
     });
     es.onerror = () => {
@@ -1018,12 +1044,13 @@ async function cancelJob() {
     activeEventSource = es;
     currentJobId = jobId;
     es.addEventListener('message', ev => appendToTerminal(JSON.parse(ev.data)));
-    es.addEventListener('done', ev => {
+    es.addEventListener('done', async ev => {
       const st = JSON.parse(ev.data);
       setJobBadge(st); appendToTerminal(`\n✔ Job finished: ${st}`);
       es.close(); activeEventSource = null; setButtonsDisabled(false);
       hideProgressIndicator();
-      refreshEnvStatus();
+      await refreshEnvStatus();
+      await refreshYcsbStatus();
       loadHosts();
     });
     es.onerror = () => { es.close(); activeEventSource = null; setButtonsDisabled(false); hideProgressIndicator(); refreshEnvStatus(); };
@@ -1039,6 +1066,8 @@ async function cancelJob() {
   loadHosts();
   {{end}}
 })();
+
+startYcsbStatusPolling();
 
 // ─── Hosts & Connections ──────────────────────────────────────────────────────
 

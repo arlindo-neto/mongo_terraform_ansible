@@ -18,6 +18,83 @@ import (
 )
 
 const dockerReplsetPortStep = 20
+const ycsbMinLoadDurationSeconds = 600
+const ycsbTargetOpsPerSecond = 1000
+
+func chaosTokenSecretsDir() string {
+	return filepath.Join(baseDir, "secrets", "chaos")
+}
+
+func chaosTokenSecretPath(envID string) string {
+	return filepath.Join(chaosTokenSecretsDir(), envID+".token")
+}
+
+func removeManagedChaosTokenFile(path string) {
+	trimmedPath := strings.TrimSpace(path)
+	if trimmedPath == "" {
+		return
+	}
+	cleanedPath := filepath.Clean(trimmedPath)
+	managedDir := filepath.Clean(chaosTokenSecretsDir())
+	if cleanedPath == managedDir || !strings.HasPrefix(cleanedPath, managedDir+string(os.PathSeparator)) {
+		return
+	}
+	_ = os.Remove(cleanedPath)
+}
+
+func migrateLegacyChaosToken(envID string, cfg *Config) error {
+	if cfg == nil || strings.TrimSpace(cfg.LegacyChaosAPIToken) == "" || strings.TrimSpace(cfg.ChaosApiTokenPath) != "" {
+		return nil
+	}
+	if err := os.MkdirAll(chaosTokenSecretsDir(), 0700); err != nil {
+		return err
+	}
+	secretPath := chaosTokenSecretPath(envID)
+	if err := os.WriteFile(secretPath, []byte(strings.TrimSpace(cfg.LegacyChaosAPIToken)+"\n"), 0600); err != nil {
+		return err
+	}
+	cfg.ChaosApiTokenPath = secretPath
+	cfg.LegacyChaosAPIToken = ""
+	return nil
+}
+
+func loadChaosTokenFromPath(path string) (string, error) {
+	trimmedPath := strings.TrimSpace(path)
+	if trimmedPath == "" {
+		return "", nil
+	}
+	data, err := os.ReadFile(trimmedPath)
+	if err != nil {
+		return "", err
+	}
+	token := strings.TrimSpace(string(data))
+	if token == "" {
+		return "", fmt.Errorf("CHAOS token file %q is empty", trimmedPath)
+	}
+	return token, nil
+}
+
+func migrateLegacyChaosTokensInState(state map[string]*Environment) error {
+	changed := false
+	for envID, env := range state {
+		if env == nil || env.Platform != "chaos" {
+			continue
+		}
+		beforePath := env.Config.ChaosApiTokenPath
+		beforeToken := env.Config.LegacyChaosAPIToken
+		if err := migrateLegacyChaosToken(envID, &env.Config); err != nil {
+			return err
+		}
+		if env.Config.ChaosApiTokenPath != beforePath || env.Config.LegacyChaosAPIToken != beforeToken {
+			state[envID] = env
+			changed = true
+		}
+	}
+	if changed {
+		return saveState(state)
+	}
+	return nil
+}
 
 // cleanupDockerModuleArtifacts removes files and directories that Terraform
 // created inside the docker module directories (modules/mongodb_replset and
@@ -112,6 +189,10 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "State error: "+err.Error(), 500)
 		return
 	}
+	if err := migrateLegacyChaosTokensInState(state); err != nil {
+		http.Error(w, "State error: "+err.Error(), 500)
+		return
+	}
 	ids := make([]string, 0, len(state))
 	for id := range state {
 		ids = append(ids, id)
@@ -146,6 +227,10 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 	dockerDefaultMinioPort := 9000
 	dockerDefaultMinioConsolePort := 9001
 	state, _ := loadState()
+	if err := migrateLegacyChaosTokensInState(state); err != nil {
+		http.Error(w, "State error: "+err.Error(), 500)
+		return
+	}
 	if envID != "" {
 		if env, ok := state[envID]; ok {
 			cfg = env.Config
@@ -194,6 +279,10 @@ func configureHandler(w http.ResponseWriter, r *http.Request) {
 func environmentHandler(w http.ResponseWriter, r *http.Request) {
 	envID := r.PathValue("env_id")
 	state, _ := loadState()
+	if err := migrateLegacyChaosTokensInState(state); err != nil {
+		http.Error(w, "State error: "+err.Error(), 500)
+		return
+	}
 	env, ok := state[envID]
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -206,7 +295,7 @@ func environmentHandler(w http.ResponseWriter, r *http.Request) {
 		SortedReplsets: sortedReplsets(env.Config.Replsets),
 		ServiceURLs:    configServiceURLs(envID, env),
 		YcsbEnabled:    env.Config.EnableYcsb,
-		YcsbAvailable:  env.Status == "provisioned" || env.Status == "running" || env.Status == "stopped",
+		YcsbAvailable:  env.Status != "configured",
 	})
 }
 
@@ -331,8 +420,30 @@ func ycsbCloudMongoURL(envID string, env *Environment, kind, target string) (str
 	return "", fmt.Errorf("unknown target kind %q", kind)
 }
 
-func ycsbStartCommand(mongoURL string) string {
-	return fmt.Sprintf("nohup /opt/ycsb/bin/ycsb run mongodb -s -P /opt/ycsb/workloads/workloada -p operationcount=1500000 -threads 4 -p mongodb.url=%s > /tmp/ycsb-run.log 2>&1 < /dev/null & echo $! > /tmp/ycsb-run.pid && tail -n 20 /tmp/ycsb-run.log || true", shellQuote(mongoURL))
+func ycsbStartCommand(binary, workloadPath, mongoURL string) string {
+	operationCount := ycsbMinLoadDurationSeconds * ycsbTargetOpsPerSecond
+	workload := fmt.Sprintf("%s run mongodb -s -P %s -p operationcount=%d -target %d -threads 4 -p mongodb.url=%s", binary, workloadPath, operationCount, ycsbTargetOpsPerSecond, shellQuote(mongoURL))
+	wrapper := fmt.Sprintf(`child=""; cleanup(){ if [ -n "$child" ]; then kill "$child" 2>/dev/null || true; fi; rm -f /tmp/ycsb-run.pid /tmp/ycsb-child.pid; }; echo $$ > /tmp/ycsb-run.pid; trap cleanup INT TERM EXIT; %s & child=$!; echo "$child" > /tmp/ycsb-child.pid; wait "$child"`, workload)
+	return fmt.Sprintf("rm -f /tmp/ycsb-run.log /tmp/ycsb-run.pid /tmp/ycsb-child.pid; nohup sh -c %s > /tmp/ycsb-run.log 2>&1 < /dev/null & echo 'YCSB workload started (minimum 10 minutes)'; sleep 1; tail -n 20 /tmp/ycsb-run.log || true", shellQuote(wrapper))
+}
+
+func ycsbProcessPattern() string {
+	return "[s]ite.ycsb.Client"
+}
+
+func ycsbStopCommand() string {
+	return fmt.Sprintf(`is_ycsb_pid(){ pid="$1"; [ -n "$pid" ] || return 1; cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"; [ -n "$cmd" ] && printf '%%s' "$cmd" | grep -Eq 'site\.ycsb\.Client|/opt/ycsb/bin/ycsb run mongodb|/ycsb/bin/ycsb run mongodb'; }; if [ -f /tmp/ycsb-child.pid ]; then child="$(cat /tmp/ycsb-child.pid)"; if ! is_ycsb_pid "$child"; then rm -f /tmp/ycsb-child.pid; fi; fi; if [ -f /tmp/ycsb-run.pid ]; then pid="$(cat /tmp/ycsb-run.pid)"; if ! is_ycsb_pid "$pid"; then rm -f /tmp/ycsb-run.pid; fi; fi; stopped=0; if [ -f /tmp/ycsb-child.pid ]; then child="$(cat /tmp/ycsb-child.pid)"; if is_ycsb_pid "$child" && kill "$child" 2>/dev/null; then stopped=1; fi; fi; if [ -f /tmp/ycsb-run.pid ]; then pid="$(cat /tmp/ycsb-run.pid)"; if is_ycsb_pid "$pid" && kill "$pid" 2>/dev/null; then stopped=1; fi; fi; if pgrep -f %q >/dev/null 2>&1; then pkill -TERM -f %q >/dev/null 2>&1 || true; stopped=1; sleep 1; fi; if pgrep -f %q >/dev/null 2>&1; then pkill -KILL -f %q >/dev/null 2>&1 || true; stopped=1; sleep 1; fi; rm -f /tmp/ycsb-run.pid /tmp/ycsb-child.pid; if pgrep -f %q >/dev/null 2>&1; then echo 'Failed to stop YCSB workload'; exit 1; fi; if [ "$stopped" -eq 1 ]; then echo 'YCSB workload stopped'; else echo 'YCSB workload already stopped'; fi; exit 0`, ycsbProcessPattern(), ycsbProcessPattern(), ycsbProcessPattern(), ycsbProcessPattern(), ycsbProcessPattern())
+}
+
+func ycsbStatusCheckCommand() string {
+	return fmt.Sprintf(`is_ycsb_pid(){ pid="$1"; [ -n "$pid" ] || return 1; cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"; [ -n "$cmd" ] && printf '%%s' "$cmd" | grep -Eq 'site\.ycsb\.Client|/opt/ycsb/bin/ycsb run mongodb|/ycsb/bin/ycsb run mongodb'; }; pid=""; if [ -f /tmp/ycsb-child.pid ]; then pid="$(cat /tmp/ycsb-child.pid)"; elif [ -f /tmp/ycsb-run.pid ]; then pid="$(cat /tmp/ycsb-run.pid)"; fi; if is_ycsb_pid "$pid"; then printf '{"running":true}
+'; elif pgrep -f %q >/dev/null 2>&1; then printf '{"running":true}
+'; else rm -f /tmp/ycsb-run.pid /tmp/ycsb-child.pid; printf '{"running":false}
+'; fi`, ycsbProcessPattern())
+}
+
+func ycsbStartGuardCommand() string {
+	return fmt.Sprintf(`is_ycsb_pid(){ pid="$1"; [ -n "$pid" ] || return 1; cmd="$(ps -p "$pid" -o args= 2>/dev/null || true)"; [ -n "$cmd" ] && printf '%%s' "$cmd" | grep -Eq 'site\.ycsb\.Client|/opt/ycsb/bin/ycsb run mongodb|/ycsb/bin/ycsb run mongodb'; }; pid=""; if [ -f /tmp/ycsb-child.pid ]; then pid="$(cat /tmp/ycsb-child.pid 2>/dev/null || true)"; elif [ -f /tmp/ycsb-run.pid ]; then pid="$(cat /tmp/ycsb-run.pid 2>/dev/null || true)"; fi; if is_ycsb_pid "$pid" || pgrep -f %q >/dev/null 2>&1; then echo 'YCSB workload is already running'; exit 1; fi; rm -f /tmp/ycsb-run.pid /tmp/ycsb-child.pid`, ycsbProcessPattern())
 }
 
 func ycsbCloudInstallPath() string {
@@ -376,9 +487,9 @@ func ycsbActionShell(envID string, env *Environment, req ycsbActionRequest) (str
 		case "load":
 			inner = fmt.Sprintf("%s load mongodb -P /ycsb/workloads/workloada -p mongodb.url=%s", binary, shellQuote(mongoURL))
 		case "start":
-			inner = fmt.Sprintf("if [ -f /tmp/ycsb-run.pid ] && kill -0 \"$(cat /tmp/ycsb-run.pid)\" 2>/dev/null; then echo 'YCSB workload is already running'; exit 1; fi; nohup %s run mongodb -s -P /ycsb/workloads/workloada -p operationcount=1500000 -threads 4 -p mongodb.url=%s > /tmp/ycsb-run.log 2>&1 < /dev/null & echo $! > /tmp/ycsb-run.pid; echo 'YCSB workload started'; sleep 1; tail -n 20 /tmp/ycsb-run.log || true", binary, shellQuote(mongoURL))
+			inner = ycsbStartGuardCommand() + "; " + ycsbStartCommand(binary, "/ycsb/workloads/workloada", mongoURL)
 		case "stop":
-			inner = "if [ -f /tmp/ycsb-run.pid ] && kill -0 \"$(cat /tmp/ycsb-run.pid)\" 2>/dev/null; then kill \"$(cat /tmp/ycsb-run.pid)\" && rm -f /tmp/ycsb-run.pid && echo 'YCSB workload stopped'; else pkill -f '/ycsb/bin/ycsb run mongodb' >/dev/null 2>&1 && echo 'YCSB workload stopped' || { echo 'No running YCSB workload found'; exit 1; }; fi"
+			inner = ycsbStopCommand()
 		}
 		return fmt.Sprintf("docker exec %s sh -lc %s", container, shellQuote(inner)), nil
 	}
@@ -393,9 +504,9 @@ func ycsbActionShell(envID string, env *Environment, req ycsbActionRequest) (str
 	case "load":
 		remote = fmt.Sprintf("%s load mongodb -P /opt/ycsb/workloads/workloada -p mongodb.url=%s", binary, shellQuote(mongoURL))
 	case "start":
-		remote = fmt.Sprintf("if [ -f /tmp/ycsb-run.pid ] && kill -0 \"$(cat /tmp/ycsb-run.pid)\" 2>/dev/null; then echo 'YCSB workload is already running'; exit 1; fi; nohup %s run mongodb -s -P /opt/ycsb/workloads/workloada -p operationcount=1500000 -threads 4 -p mongodb.url=%s > /tmp/ycsb-run.log 2>&1 < /dev/null & echo $! > /tmp/ycsb-run.pid; echo 'YCSB workload started'; sleep 1; tail -n 20 /tmp/ycsb-run.log || true", binary, shellQuote(mongoURL))
+		remote = ycsbStartGuardCommand() + "; " + ycsbStartCommand(binary, "/opt/ycsb/workloads/workloada", mongoURL)
 	case "stop":
-		remote = "if [ -f /tmp/ycsb-run.pid ] && kill -0 \"$(cat /tmp/ycsb-run.pid)\" 2>/dev/null; then kill \"$(cat /tmp/ycsb-run.pid)\" && rm -f /tmp/ycsb-run.pid && echo 'YCSB workload stopped'; else pkill -f '/opt/ycsb/bin/ycsb run mongodb' >/dev/null 2>&1 && echo 'YCSB workload stopped' || { echo 'No running YCSB workload found'; exit 1; }; fi"
+		remote = ycsbStopCommand()
 	}
 	return fmt.Sprintf("ssh %s %s", shellQuote(host), shellQuote(remote)), nil
 }
@@ -404,7 +515,7 @@ func ycsbStatusShell(envID string, env *Environment) (string, error) {
 	if !env.Config.EnableYcsb {
 		return "", fmt.Errorf("YCSB is not enabled for this environment")
 	}
-	check := `if [ -f /tmp/ycsb-run.pid ] && kill -0 "$(cat /tmp/ycsb-run.pid)" 2>/dev/null; then printf '{"running":true}\n'; else printf '{"running":false}\n'; fi`
+	check := ycsbStatusCheckCommand()
 	if env.Platform == "docker" {
 		return fmt.Sprintf("docker exec %s sh -lc %s", shellQuote(ycsbDockerContainerName(envID, env)), shellQuote(check)), nil
 	}
@@ -607,6 +718,54 @@ func apiUploadSSHKeyHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"path": name})
 }
 
+// POST /api/upload-chaos-token
+func apiUploadChaosTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		jsonError(w, 400, "failed to parse upload: "+err.Error())
+		return
+	}
+	file, header, err := r.FormFile("chaos_token_file")
+	if err != nil {
+		jsonError(w, 400, "chaos_token_file field missing: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	envID := r.FormValue("env_id")
+	if envID == "" {
+		envID = secureID(4)
+	}
+	if !envIDRe.MatchString(envID) {
+		jsonError(w, 400, "invalid env_id")
+		return
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		jsonError(w, 500, "read failed: "+err.Error())
+		return
+	}
+	token := strings.TrimSpace(string(data))
+	if token == "" {
+		jsonError(w, 400, "uploaded token file is empty")
+		return
+	}
+	if err := os.MkdirAll(chaosTokenSecretsDir(), 0700); err != nil {
+		jsonError(w, 500, "cannot create secrets dir: "+err.Error())
+		return
+	}
+	secretPath := chaosTokenSecretPath(envID)
+	if err := os.WriteFile(secretPath, []byte(token+"\n"), 0600); err != nil {
+		jsonError(w, 500, "write failed: "+err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]string{
+		"env_id":   envID,
+		"path":     secretPath,
+		"filename": filepath.Base(header.Filename),
+	})
+}
+
 // GET /api/images/{platform}?region={region}
 func apiImagesHandler(w http.ResponseWriter, r *http.Request) {
 	platform := r.PathValue("platform")
@@ -644,6 +803,18 @@ func saveEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "invalid platform")
 		return
 	}
+	if payload.Platform == "chaos" {
+		payload.Config.LegacyChaosAPIToken = ""
+		payload.Config.ChaosApiTokenPath = strings.TrimSpace(payload.Config.ChaosApiTokenPath)
+		if payload.Config.ChaosApiTokenPath == "" {
+			jsonError(w, 400, "chaos_api_token_path is required")
+			return
+		}
+		if _, err := loadChaosTokenFromPath(payload.Config.ChaosApiTokenPath); err != nil {
+			jsonError(w, 400, "failed to read CHAOS token file: "+err.Error())
+			return
+		}
+	}
 
 	// Default the prefix to the environment name for all platforms so resources
 	// are namespaced consistently. Users can override this in the form.
@@ -658,6 +829,10 @@ func saveEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 500, "state load failed: "+err.Error())
 		return
 	}
+	if err := migrateLegacyChaosTokensInState(state); err != nil {
+		jsonError(w, 500, "state load failed: "+err.Error())
+		return
+	}
 
 	if payload.Platform == "docker" {
 		assignDockerReplsetPorts(&payload.Config)
@@ -668,6 +843,9 @@ func saveEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	existing := state[payload.EnvID]
+	if payload.Platform == "chaos" && existing != nil && existing.Config.ChaosApiTokenPath != payload.Config.ChaosApiTokenPath {
+		removeManagedChaosTokenFile(existing.Config.ChaosApiTokenPath)
+	}
 	status := "configured"
 	createdAt := time.Now().UTC().Format(time.RFC3339)
 	if existing != nil {
@@ -711,6 +889,9 @@ func deleteEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 	saveState(state)
 
 	if env != nil {
+		if env.Platform == "chaos" {
+			removeManagedChaosTokenFile(env.Config.ChaosApiTokenPath)
+		}
 		p := tfvarsPath(envID, env.Platform)
 		os.Remove(p)
 		os.Remove(tfstatePath(envID, env.Platform))
@@ -738,6 +919,9 @@ func purgeDeletedEnvironmentsHandler(w http.ResponseWriter, r *http.Request) {
 	count := 0
 	for id, env := range state {
 		if env.Status == "deleted" {
+			if env.Platform == "chaos" {
+				removeManagedChaosTokenFile(env.Config.ChaosApiTokenPath)
+			}
 			delete(state, id)
 			os.Remove(tfvarsPath(id, env.Platform))
 			os.Remove(tfstatePath(id, env.Platform))
@@ -760,6 +944,10 @@ func getTfvarsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	state, _ := loadState()
+	if err := migrateLegacyChaosTokensInState(state); err != nil {
+		jsonError(w, 500, "state error: "+err.Error())
+		return
+	}
 	env, ok := state[envID]
 	if !ok {
 		jsonError(w, 404, "environment not found")
@@ -1205,8 +1393,15 @@ func environmentActionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// For CHAOS environments, pass the API token via an environment variable so
 	// it is never written to the tfvars file on disk.
-	if platform == "chaos" && env.Config.ChaosApiToken != "" {
-		extraEnv["CHAOS_API_TOKEN"] = env.Config.ChaosApiToken
+	if platform == "chaos" {
+		token, err := loadChaosTokenFromPath(env.Config.ChaosApiTokenPath)
+		if err != nil {
+			jsonError(w, 500, "failed to read CHAOS token file: "+err.Error())
+			return
+		}
+		if token != "" {
+			extraEnv["CHAOS_API_TOKEN"] = token
+		}
 	}
 
 	jobID := startJob(cmd, tfDir, extraEnv, onComplete)

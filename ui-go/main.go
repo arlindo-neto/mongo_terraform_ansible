@@ -337,6 +337,7 @@ func main() {
 	mux.HandleFunc("GET /api/images/{platform}", apiImagesHandler)
 	mux.HandleFunc("GET /api/prerequisites/{platform}", apiPrerequisitesHandler)
 	mux.HandleFunc("POST /api/upload-ssh-key/{platform}", apiUploadSSHKeyHandler)
+	mux.HandleFunc("POST /api/upload-chaos-token", apiUploadChaosTokenHandler)
 	mux.HandleFunc("POST /api/environment", saveEnvironmentHandler)
 	mux.HandleFunc("DELETE /api/environment/{env_id}", deleteEnvironmentHandler)
 	mux.HandleFunc("DELETE /api/environments/deleted", purgeDeletedEnvironmentsHandler)

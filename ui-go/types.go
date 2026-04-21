@@ -131,10 +131,11 @@ type Config struct {
 	MachineImage string `json:"machine_image,omitempty"`
 
 	// CHAOS-specific settings
-	ChaosApiToken   string `json:"chaos_api_token,omitempty"`
-	EnableMinio     *bool  `json:"enable_minio,omitempty"`
-	DeleteAfterDays int    `json:"delete_after_days,omitempty"`
-	OsImage         string `json:"os_image,omitempty"`
+	ChaosApiTokenPath  string `json:"chaos_api_token_path,omitempty"`
+	LegacyChaosAPIToken string `json:"chaos_api_token,omitempty"`
+	EnableMinio        *bool  `json:"enable_minio,omitempty"`
+	DeleteAfterDays    int    `json:"delete_after_days,omitempty"`
+	OsImage            string `json:"os_image,omitempty"`
 	// FirewallRules replaces the old SourceRanges single string for CHAOS.
 	// Each entry is an independent ingress rule with its own CIDR and port.
 	FirewallRules      []ChaosFirewallRule `json:"firewall_rules,omitempty"`
