@@ -47,6 +47,11 @@ variable "vm_condition_poweron" {
   default = true
 }
 
+variable "domain_type" {
+  type    = string
+  default = "qemu"
+}
+
 variable "arch" {
   type    = string
   default = "x86_64"

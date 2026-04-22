@@ -90,8 +90,8 @@ resource "libvirt_domain" "domain-distro" {
   memory    = var.memory[count.index]
   vcpu      = var.vcpu
   arch      = var.arch
+  type      = var.domain_type
   machine   = local.machine
-  cloudinit = element(libvirt_cloudinit_disk.commoninit.*.id, count.index)
 
   firmware = local.is_arm && var.firmware != "" ? var.firmware : null
 
@@ -107,27 +107,43 @@ resource "libvirt_domain" "domain-distro" {
     network_name = "priv"
     addresses    = [var.ips[count.index]]
   }
+
   console {
     type        = "pty"
     target_port = "0"
     target_type = "serial"
   }
-  console {
-    type        = "pty"
-    target_port = "1"
-    target_type = "virtio"
-  }
 
-  graphics {
-    type        = "vnc"
-    listen_type = "address"
-  }
-
-  cpu {
-    mode = "host-passthrough"
-  }
   disk {
     volume_id = element(libvirt_volume.worker.*.id, count.index)
+  }
+
+  # Use cloudinit attribute again, but we will try to fix it with XSLT if needed
+  cloudinit = element(libvirt_cloudinit_disk.commoninit.*.id, count.index)
+
+  # ARM virt machine does not support IDE; convert cloud-init cdrom to virtio disk
+  xml {
+    xslt = <<EOF
+<?xml version="1.0" ?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output omit-xml-declaration="yes" indent="yes"/>
+  <xsl:template match="node()|@*">
+    <xsl:copy>
+      <xsl:apply-templates select="node()|@*"/>
+    </xsl:copy>
+  </xsl:template>
+
+  <xsl:template match="/domain/devices/controller[@type='ide']"/>
+
+  <xsl:template match="/domain/devices/disk[@device='cdrom'][./target[@bus='ide']]">
+    <disk type='file' device='disk'>
+      <xsl:apply-templates select="driver|source"/>
+      <target dev='vdb' bus='virtio'/>
+      <readonly/>
+    </disk>
+  </xsl:template>
+</xsl:stylesheet>
+EOF
   }
 }
 
@@ -142,4 +158,3 @@ resource "null_resource" "shutdowner" {
     command = var.vm_condition_poweron ? "echo 'do nothing'" : "virsh -c qemu:///system shutdown ${each.value}"
   }
 }
-

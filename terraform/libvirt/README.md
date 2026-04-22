@@ -32,10 +32,25 @@ Firmware paths (used for the `firmware` and `nvram_template` variables):
 
 | Variable | Path |
 |---|---|
-| `firmware` | `/usr/share/AAVMF/AAVMF_CODE.fd` |
+| `firmware` | `/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd` |
 | `nvram_template` | `/usr/share/AAVMF/AAVMF_VARS.fd` |
 
-### 3. Install OpenTofu or Terraform
+> **Note:** Use `AAVMF_CODE.no-secboot.fd`, not `AAVMF_CODE.fd`. Libvirt selects firmware via descriptor files in `/usr/share/qemu/firmware/`, and `AAVMF_CODE.fd` has no matching descriptor.
+
+### 3. AppArmor fix (x86_64 hosts only)
+
+On x86_64 hosts, libvirt runs aarch64 guests as `type='qemu'` (software emulation). Unlike `type='kvm'`, these domains do not automatically receive AppArmor rules granting disk access when the storage pool is outside `/var/lib/libvirt/`. Add a local override once:
+
+```bash
+sudo mkdir -p /etc/apparmor.d/abstractions/libvirt-qemu.d
+sudo tee /etc/apparmor.d/abstractions/libvirt-qemu.d/local-pool > /dev/null << 'EOF'
+/path/to/your/terraform/libvirt/pool/** rwk,
+EOF
+```
+
+Replace `/path/to/your/terraform/libvirt/pool/` with the absolute path to this directory's `pool/` folder. The change takes effect immediately for new domains — no service restart needed.
+
+### 4. Install OpenTofu or Terraform
 
 [OpenTofu install guide](https://opentofu.org/docs/intro/install/)
 
@@ -90,6 +105,12 @@ Firmware paths (used for the `firmware` and `nvram_template` variables):
      https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-arm64.qcow2
    ```
 
+   **Debian 13 (Trixie) — aarch64:**
+   ```bash
+   curl --output-dir sources --create-dirs -L -o debian13-arm64.qcow2 \
+     https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-arm64-daily.qcow2
+   ```
+
 4. **Initialize and apply:**
    ```bash
    tofu init
@@ -116,6 +137,7 @@ Default credentials: user `admin`, password `admin`, SSH key from `ssh_keys/open
 | `source_vm` | `sources/rocky9.qcow2` | Path to cloud image |
 | `interface` | `ens01` | Guest network interface name |
 | `arch` | `x86_64` | CPU architecture: `x86_64` or `aarch64` |
+| `domain_type` | `qemu` | Libvirt domain type (`qemu` for cross-arch emulation, `kvm` for native) |
 | `firmware` | `""` | UEFI firmware path (required for `aarch64`) |
 | `nvram_template` | `""` | UEFI NVRAM template path (required for `aarch64`) |
 
@@ -126,10 +148,13 @@ After completing the ARM prerequisites above:
 ```bash
 tofu apply \
   -var 'arch=aarch64' \
-  -var 'source_vm=sources/debian12-arm64.qcow2' \
-  -var 'firmware=/usr/share/AAVMF/AAVMF_CODE.fd' \
+  -var 'source_vm=sources/debian13-arm64.qcow2' \
+  -var 'interface=enp1s0' \
+  -var 'firmware=/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd' \
   -var 'nvram_template=/usr/share/AAVMF/AAVMF_VARS.fd'
 ```
+
+> **Note:** The network interface inside ARM `virt` machine guests is `enp1s0` (PCIe), not the default `ens01`. Boot time for aarch64 guests on x86_64 hosts is 10–30+ minutes due to software emulation — this is expected.
 
 ## Shutdown VMs
 
