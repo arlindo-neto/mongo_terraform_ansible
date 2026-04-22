@@ -10,8 +10,12 @@ terraform {
 }
 
 provider "libvirt" {
-  # uri = "qemu:///system?socket=/run/libvirt/libvirt-sock"
   uri = "qemu:///system"
+}
+
+locals {
+  is_arm  = var.arch == "aarch64"
+  machine = local.is_arm ? "virt" : "pc"
 }
 
 resource "libvirt_pool" "k8s" {
@@ -43,7 +47,7 @@ resource "libvirt_volume" "worker" {
 
 resource "libvirt_cloudinit_disk" "commoninit" {
   count = var.hosts
-  name  = "commoninit-rocky_${var.hostnames[count.index]}.iso"
+  name  = "commoninit_${var.hostnames[count.index]}.iso"
   pool  = libvirt_pool.k8s.name
   user_data = templatefile("${path.module}/templates/user_data.tpl",
     {
@@ -85,7 +89,19 @@ resource "libvirt_domain" "domain-distro" {
   name      = var.hostnames[count.index]
   memory    = var.memory[count.index]
   vcpu      = var.vcpu
+  arch      = var.arch
+  machine   = local.machine
   cloudinit = element(libvirt_cloudinit_disk.commoninit.*.id, count.index)
+
+  firmware = local.is_arm && var.firmware != "" ? var.firmware : null
+
+  dynamic "nvram" {
+    for_each = local.is_arm && var.firmware != "" && var.nvram_template != "" ? [1] : []
+    content {
+      file     = "/var/lib/libvirt/qemu/nvram/${var.hostnames[count.index]}_VARS.fd"
+      template = var.nvram_template
+    }
+  }
 
   network_interface {
     network_name = "priv"
@@ -127,6 +143,3 @@ resource "null_resource" "shutdowner" {
   }
 }
 
-variable "vm_condition_poweron" {
-  default = true
-}
