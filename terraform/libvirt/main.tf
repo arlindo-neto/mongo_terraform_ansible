@@ -142,6 +142,13 @@ resource "libvirt_domain" "domain-distro" {
       <readonly/>
     </disk>
   </xsl:template>
+
+  <!-- libvirt defaults aarch64 to cortex-a15 (32-bit ARMv7); inject 64-bit cortex-a57 before libvirt fills the default -->
+  <xsl:template match="/domain/cpu">
+    <cpu mode='custom' match='exact'>
+      <model fallback='allow'>cortex-a57</model>
+    </cpu>
+  </xsl:template>
 </xsl:stylesheet>
 EOF
   }
