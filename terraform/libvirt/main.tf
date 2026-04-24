@@ -4,7 +4,7 @@ terraform {
   required_providers {
     libvirt = {
       source  = "dmacvicar/libvirt"
-      version = "0.8.3"
+      version = "0.9.7"
     }
   }
 }
@@ -21,38 +21,73 @@ locals {
 resource "libvirt_pool" "k8s" {
   name = "k8s"
   type = "dir"
-  path = abspath("${path.module}/pool")
+  target = {
+    path = abspath("${path.module}/pool")
+  }
 }
 
 resource "libvirt_volume" "os_image" {
-  name   = "os_image"
-  pool   = libvirt_pool.k8s.name
-  source = "${path.module}/${var.source_vm}"
-  format = "qcow2"
+  name = "os_image"
+  pool = libvirt_pool.k8s.name
+  create = {
+    content = {
+      url = "file://${abspath("${path.module}/${var.source_vm}")}"
+    }
+  }
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 resource "libvirt_volume" "disk_resized" {
-  name           = "disk"
-  pool           = libvirt_pool.k8s.name
-  base_volume_id = libvirt_volume.os_image.id
-  size           = 20000000000 # 20GiB
+  name          = "disk"
+  pool          = libvirt_pool.k8s.name
+  capacity      = 20000000000
+  capacity_unit = "B"
+  backing_store = {
+    path = libvirt_volume.os_image.path
+    format = {
+      type = "qcow2"
+    }
+  }
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 resource "libvirt_volume" "worker" {
-  name           = "worker_${count.index}.qcow2"
-  pool           = libvirt_pool.k8s.name
-  base_volume_id = libvirt_volume.disk_resized.id
-  count          = var.hosts
+  count         = var.hosts
+  name          = "worker_${count.index}.qcow2"
+  pool          = libvirt_pool.k8s.name
+  capacity      = 20000000000
+  capacity_unit = "B"
+  backing_store = {
+    path = libvirt_volume.disk_resized.path
+    format = {
+      type = "qcow2"
+    }
+  }
+  target = {
+    format = {
+      type = "qcow2"
+    }
+  }
 }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
-  count = var.hosts
-  name  = "commoninit_${var.hostnames[count.index]}.iso"
-  pool  = libvirt_pool.k8s.name
-  user_data = templatefile("${path.module}/templates/user_data.tpl",
-    {
-      host_name = var.hostnames[count.index]
-      auth_key  = file("${path.module}/ssh_keys/opentofu.pub")
+  count   = var.hosts
+  name    = "commoninit_${var.hostnames[count.index]}"
+  user_data = templatefile("${path.module}/templates/user_data.tpl", {
+    host_name = var.hostnames[count.index]
+    auth_key  = file("${path.module}/ssh_keys/opentofu.pub")
+  })
+  meta_data = yamlencode({
+    instance-id    = var.hostnames[count.index]
+    local-hostname = var.hostnames[count.index]
   })
   network_config = templatefile("${path.module}/templates/network_config.tpl", {
     interface = var.interface
@@ -60,110 +95,105 @@ resource "libvirt_cloudinit_disk" "commoninit" {
   })
 }
 
-resource "libvirt_network" "priv" {
-  # the name used by libvirt
-  name = "priv"
-
-  # mode can be: "nat" (default), "none", "route", "open", "bridge"
-  mode = "nat"
-
-  #  the domain used by the DNS server in this network
-  domain = "default.local"
-
-  dns {
-    enabled    = true
-    local_only = true
+resource "libvirt_volume" "cloudinit_vol" {
+  count = var.hosts
+  name  = "commoninit_${var.hostnames[count.index]}.iso"
+  pool  = libvirt_pool.k8s.name
+  create = {
+    content = {
+      url = libvirt_cloudinit_disk.commoninit[count.index].path
+    }
   }
+}
 
-  # Whether the network should be started automatically when the host boots
+resource "libvirt_network" "priv" {
+  name      = "priv"
   autostart = true
-
-  #  list of subnets the addresses allowed for domains connected
-  # also derived to define the host addresses
-  # also derived to define the addresses served by the DHCP server
-  addresses = ["192.168.100.0/24"]
+  forward = {
+    mode = "nat"
+  }
+  domain = {
+    name       = "default.local"
+    local_only = "yes"
+  }
+  ips = [
+    {
+      address = "192.168.100.1"
+      netmask = "255.255.255.0"
+    }
+  ]
 }
 
 resource "libvirt_domain" "domain-distro" {
-  count     = var.hosts
-  name      = var.hostnames[count.index]
-  memory    = var.memory[count.index]
-  vcpu      = var.vcpu
-  arch      = var.arch
-  type      = var.domain_type
-  machine   = local.machine
+  count       = var.hosts
+  name        = var.hostnames[count.index]
+  memory      = var.memory[count.index]
+  memory_unit = "MiB"
+  vcpu        = var.vcpu
+  type        = var.domain_type
 
-  firmware = local.is_arm && var.firmware != "" ? var.firmware : null
-
-  dynamic "nvram" {
-    for_each = local.is_arm && var.firmware != "" && var.nvram_template != "" ? [1] : []
-    content {
-      file     = "/var/lib/libvirt/qemu/nvram/${var.hostnames[count.index]}_VARS.fd"
-      template = var.nvram_template
-    }
+  os = {
+    type         = "hvm"
+    type_arch    = var.arch
+    type_machine = local.machine
+    loader       = local.is_arm && var.firmware != "" ? var.firmware : null
   }
 
-  network_interface {
-    network_name = "priv"
-    addresses    = [var.ips[count.index]]
-  }
+  devices = {
+    consoles = [
+      {
+        type = "pty"
+        target = {
+          type = "serial"
+          port = 0
+        }
+      }
+    ]
 
-  console {
-    type        = "pty"
-    target_port = "0"
-    target_type = "serial"
-  }
+    disks = [
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.k8s.name
+            volume = libvirt_volume.worker[count.index].name
+          }
+        }
+        target = {
+          dev = "vda"
+          bus = "virtio"
+        }
+      },
+      {
+        source = {
+          volume = {
+            pool   = libvirt_pool.k8s.name
+            volume = libvirt_volume.cloudinit_vol[count.index].name
+          }
+        }
+        target = {
+          dev = local.is_arm ? "vdb" : "sda"
+          bus = local.is_arm ? "virtio" : "sata"
+        }
+        readonly = true
+      }
+    ]
 
-  disk {
-    volume_id = element(libvirt_volume.worker.*.id, count.index)
-  }
-
-  # Use cloudinit attribute again, but we will try to fix it with XSLT if needed
-  cloudinit = element(libvirt_cloudinit_disk.commoninit.*.id, count.index)
-
-  # ARM virt machine does not support IDE; convert cloud-init cdrom to virtio disk
-  xml {
-    xslt = <<EOF
-<?xml version="1.0" ?>
-<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-  <xsl:output omit-xml-declaration="yes" indent="yes"/>
-  <xsl:template match="node()|@*">
-    <xsl:copy>
-      <xsl:apply-templates select="node()|@*"/>
-    </xsl:copy>
-  </xsl:template>
-
-  <xsl:template match="/domain/devices/controller[@type='ide']"/>
-
-  <xsl:template match="/domain/devices/disk[@device='cdrom'][./target[@bus='ide']]">
-    <disk type='file' device='disk'>
-      <xsl:apply-templates select="driver|source"/>
-      <target dev='vdb' bus='virtio'/>
-      <readonly/>
-    </disk>
-  </xsl:template>
-
-  <!-- libvirt defaults aarch64 to cortex-a15 (32-bit ARMv7); inject 64-bit cortex-a57 before libvirt fills the default -->
-  <xsl:template match="/domain/cpu">
-    <cpu mode='custom' match='exact'>
-      <model fallback='allow'>cortex-a57</model>
-    </cpu>
-  </xsl:template>
-
-  <!-- libvirt 9.x: provider sets firmware='efi' on <os> which enables autoselection and then
-       rejects readonly/type on <loader>; strip the firmware attribute so explicit loader is used -->
-  <xsl:template match="/domain/os">
-    <os>
-      <xsl:apply-templates select="@*[name()!='firmware']|node()"/>
-    </os>
-  </xsl:template>
-</xsl:stylesheet>
-EOF
+    interfaces = [
+      {
+        model = {
+          type = "virtio"
+        }
+        source = {
+          network = {
+            network = libvirt_network.priv.name
+          }
+        }
+      }
+    ]
   }
 }
 
 resource "null_resource" "shutdowner" {
-  # iterate with for_each over Vms list ( my *.tf file creates VMs from list)
   for_each = toset(var.hostnames)
   triggers = {
     trigger = var.vm_condition_poweron
