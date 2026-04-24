@@ -30,12 +30,14 @@ sudo apt install -y qemu-system-arm qemu-efi-aarch64
 
 Firmware paths (used for the `firmware` and `nvram_template` variables):
 
-| Variable | Path |
-|---|---|
-| `firmware` | `/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd` |
-| `nvram_template` | `/usr/share/AAVMF/AAVMF_VARS.fd` |
+| Distro | `firmware` | `nvram_template` |
+|---|---|---|
+| Ubuntu 24.04 | `/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd` | `/usr/share/AAVMF/AAVMF_VARS.fd` |
+| Debian 12 | `/usr/share/AAVMF/AAVMF_CODE.fd` | `/usr/share/AAVMF/AAVMF_VARS.fd` |
 
-> **Note:** Use `AAVMF_CODE.no-secboot.fd`, not `AAVMF_CODE.fd`. Libvirt selects firmware via descriptor files in `/usr/share/qemu/firmware/`, and `AAVMF_CODE.fd` has no matching descriptor.
+> **Note (Ubuntu):** Use `AAVMF_CODE.no-secboot.fd`, not `AAVMF_CODE.fd`. Libvirt selects firmware via descriptor files in `/usr/share/qemu/firmware/`, and `AAVMF_CODE.fd` has no matching descriptor on Ubuntu.
+>
+> **Note (Debian 12):** `AAVMF_CODE.no-secboot.fd` does not exist. Use `AAVMF_CODE.fd` instead — its descriptor (`60-edk2-aarch64.json`) lists no Secure Boot features, so it is effectively the same non-secboot firmware.
 
 ### 3. AppArmor fix (x86_64 hosts only)
 
@@ -145,6 +147,7 @@ Default credentials: user `admin`, password `admin`, SSH key from `ssh_keys/open
 
 After completing the ARM prerequisites above:
 
+**Ubuntu 24.04 host:**
 ```bash
 tofu apply \
   -var 'arch=aarch64' \
@@ -154,7 +157,27 @@ tofu apply \
   -var 'nvram_template=/usr/share/AAVMF/AAVMF_VARS.fd'
 ```
 
+**Debian 12 host:**
+```bash
+tofu apply \
+  -var 'arch=aarch64' \
+  -var 'source_vm=sources/debian13-arm64.qcow2' \
+  -var 'interface=enp1s0' \
+  -var 'firmware=/usr/share/AAVMF/AAVMF_CODE.fd' \
+  -var 'nvram_template=/usr/share/AAVMF/AAVMF_VARS.fd'
+```
+
 > **Note:** The network interface inside ARM `virt` machine guests is `enp1s0` (PCIe), not the default `ens01`. Boot time for aarch64 guests on x86_64 hosts is 10–30+ minutes due to software emulation — this is expected.
+
+## Monitoring ARM boot progress
+
+Since aarch64 guests under software emulation take 10–30+ minutes to boot, you can watch the serial console to confirm progress rather than waiting blindly for SSH:
+
+```bash
+virsh -c qemu:///system console db-1
+```
+
+Press `Ctrl+]` to detach. You will see UEFI output, then the GRUB menu, then the kernel and cloud-init log streaming in real time.
 
 ## Shutdown VMs
 

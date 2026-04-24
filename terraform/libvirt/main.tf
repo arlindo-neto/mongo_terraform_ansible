@@ -149,6 +149,14 @@ resource "libvirt_domain" "domain-distro" {
       <model fallback='allow'>cortex-a57</model>
     </cpu>
   </xsl:template>
+
+  <!-- libvirt 9.x: provider sets firmware='efi' on <os> which enables autoselection and then
+       rejects readonly/type on <loader>; strip the firmware attribute so explicit loader is used -->
+  <xsl:template match="/domain/os">
+    <os>
+      <xsl:apply-templates select="@*[name()!='firmware']|node()"/>
+    </os>
+  </xsl:template>
 </xsl:stylesheet>
 EOF
   }
