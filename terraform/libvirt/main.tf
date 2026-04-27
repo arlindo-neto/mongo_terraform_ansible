@@ -124,6 +124,17 @@ resource "libvirt_network" "priv" {
   ]
 }
 
+# Pre-create NVRAM files from the template so libvirt can write UEFI variables.
+# Required for aarch64 UEFI domains — without a pre-seeded NVRAM file the
+# domain definition fails because libvirt cannot create one at define time.
+resource "null_resource" "nvram_init" {
+  for_each = local.is_arm && var.nvram_template != "" ? toset(var.hostnames) : toset([])
+
+  provisioner "local-exec" {
+    command = "cp -n ${var.nvram_template} /var/lib/libvirt/qemu/nvram/${each.value}_VARS.fd && chmod 0660 /var/lib/libvirt/qemu/nvram/${each.value}_VARS.fd"
+  }
+}
+
 resource "libvirt_domain" "domain-distro" {
   count       = var.hosts
   name        = var.hostnames[count.index]
@@ -132,11 +143,18 @@ resource "libvirt_domain" "domain-distro" {
   vcpu        = var.vcpu
   type        = var.domain_type
 
+  depends_on = [null_resource.nvram_init]
+
   os = {
     type         = "hvm"
     type_arch    = var.arch
     type_machine = local.machine
-    loader       = local.is_arm && var.firmware != "" ? var.firmware : null
+    loader          = local.is_arm && var.firmware != "" ? var.firmware : null
+    loader_type     = local.is_arm && var.firmware != "" ? "pflash" : null
+    loader_readonly = local.is_arm && var.firmware != "" ? "yes" : null
+    nv_ram = local.is_arm && var.nvram_template != "" ? {
+      nv_ram = "/var/lib/libvirt/qemu/nvram/${var.hostnames[count.index]}_VARS.fd"
+    } : null
   }
 
   devices = {
@@ -190,6 +208,17 @@ resource "libvirt_domain" "domain-distro" {
         }
       }
     ]
+  }
+}
+
+resource "null_resource" "starter" {
+  count = var.hosts
+  triggers = {
+    domain_id = libvirt_domain.domain-distro[count.index].id
+  }
+
+  provisioner "local-exec" {
+    command = "virsh -c qemu:///system start ${var.hostnames[count.index]} || true"
   }
 }
 

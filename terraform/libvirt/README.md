@@ -12,7 +12,7 @@ This module creates:
 
 ### 1. Install KVM/Libvirt
 
-Requires Ubuntu 24.04 LTS as the virtualization host.
+Tested on Debian 12 (Bookworm) and Ubuntu 24.04 LTS.
 
 ```bash
 sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst genisoimage
@@ -39,7 +39,9 @@ Firmware paths (used for the `firmware` and `nvram_template` variables):
 >
 > **Note (Debian 12):** `AAVMF_CODE.no-secboot.fd` does not exist. Use `AAVMF_CODE.fd` instead — its descriptor (`60-edk2-aarch64.json`) lists no Secure Boot features, so it is effectively the same non-secboot firmware.
 
-### 3. AppArmor fix (x86_64 hosts only)
+NVRAM files (`/var/lib/libvirt/qemu/nvram/<hostname>_VARS.fd`) are created automatically from the template at apply time — no manual copy step is needed.
+
+### 3. AppArmor fix (x86_64 hosts running aarch64 guests only)
 
 On x86_64 hosts, libvirt runs aarch64 guests as `type='qemu'` (software emulation). Unlike `type='kvm'`, these domains do not automatically receive AppArmor rules granting disk access when the storage pool is outside `/var/lib/libvirt/`. Add a local override once:
 
@@ -65,7 +67,6 @@ Replace `/path/to/your/terraform/libvirt/pool/` with the absolute path to this d
 
 2. **Generate SSH Keys:**
    ```bash
-   mkdir -p ssh_keys
    ssh-keygen -b 2048 -t rsa -f ./ssh_keys/opentofu -q -N ""
    ```
 
@@ -114,10 +115,14 @@ Replace `/path/to/your/terraform/libvirt/pool/` with the absolute path to this d
    ```
 
 4. **Initialize and apply:**
+
+   x86_64 (default):
    ```bash
    tofu init
    tofu apply
    ```
+
+   aarch64 — see the [ARM example](#arm-aarch64-example) below.
 
 ## Connecting to Instances
 
@@ -126,6 +131,8 @@ ssh -i ./ssh_keys/opentofu admin@192.168.100.10
 ```
 
 Default credentials: user `admin`, password `admin`, SSH key from `ssh_keys/opentofu`.
+
+VMs start automatically after `tofu apply`. On first boot cloud-init runs `package_update` and `package_upgrade`, so allow a few minutes before SSH is ready. On aarch64 guests running under software emulation, allow 10–30 minutes — see [Monitoring ARM boot progress](#monitoring-arm-boot-progress).
 
 ## Variables
 
@@ -149,6 +156,7 @@ After completing the ARM prerequisites above:
 
 **Ubuntu 24.04 host:**
 ```bash
+tofu init
 tofu apply \
   -var 'arch=aarch64' \
   -var 'source_vm=sources/debian13-arm64.qcow2' \
@@ -159,6 +167,7 @@ tofu apply \
 
 **Debian 12 host:**
 ```bash
+tofu init
 tofu apply \
   -var 'arch=aarch64' \
   -var 'source_vm=sources/debian13-arm64.qcow2' \
@@ -181,9 +190,44 @@ Press `Ctrl+]` to detach. You will see UEFI output, then the GRUB menu, then the
 
 ## Shutdown VMs
 
+Pass the same `-var` flags used during apply so the plan is consistent:
+
 ```bash
+# aarch64
+tofu apply \
+  -var 'vm_condition_poweron=false' \
+  -var 'arch=aarch64' \
+  -var 'source_vm=sources/debian13-arm64.qcow2' \
+  -var 'interface=enp1s0' \
+  -var 'firmware=/usr/share/AAVMF/AAVMF_CODE.fd' \
+  -var 'nvram_template=/usr/share/AAVMF/AAVMF_VARS.fd'
+
+# x86_64
 tofu apply -var 'vm_condition_poweron=false'
 ```
+
+## Destroy
+
+Pass the same `-var` flags used during apply:
+
+```bash
+# aarch64
+tofu destroy \
+  -var 'arch=aarch64' \
+  -var 'source_vm=sources/debian13-arm64.qcow2' \
+  -var 'interface=enp1s0' \
+  -var 'firmware=/usr/share/AAVMF/AAVMF_CODE.fd' \
+  -var 'nvram_template=/usr/share/AAVMF/AAVMF_VARS.fd'
+
+# x86_64
+tofu destroy
+```
+
+> **Note:** The storage pool directory (`pool/`) contains a `.gitkeep` placeholder file, so `tofu destroy` will fail to delete the pool with "Directory not empty". If that happens, remove the pool from state and undefine it manually:
+> ```bash
+> tofu state rm libvirt_pool.k8s
+> virsh -c qemu:///system pool-undefine k8s
+> ```
 
 ## Notes
 
