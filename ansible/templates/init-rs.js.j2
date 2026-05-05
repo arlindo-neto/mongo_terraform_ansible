@@ -5,11 +5,14 @@ rs.initiate(
     _id: "{{ replset_name }}",
     members: [
       {% for h in groups[ group_names[0] ] %}
-      { 
-        _id : {{ loop.index }}, 
+      {
+        _id : {{ loop.index }},
         host : "{{ hostvars[h].ansible_facts['fqdn'] }}:{{ mongo_port }}",
         {% if hostvars[h].arbiter | default(false) %}
         arbiterOnly: true
+        {% elif hostvars[h].mongodb_hidden | default(false) %}
+        priority: 0,
+        hidden: true
         {% else %}
         priority: {% if hostvars[h].mongodb_primary | default(false) %}2{% else %}1{% endif %}
         {% endif %}

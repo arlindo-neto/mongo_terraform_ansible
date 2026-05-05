@@ -108,9 +108,15 @@
   become: yes
   tags: backup
   tasks:
+    - name: Install cron (required for backup scheduling)
+      package:
+        name: cron
+        state: present
+      when: ansible_facts['os_family'] == 'Debian'
+
     - name: set up storage location for PBM
       shell: pbm config --file '{{ pbm_config_path }}' --mongodb-uri '{{ mongodb_uri }}'
-      when: mongodb_primary is defined and mongodb_primary
+      when: mongodb_primary is defined and mongodb_primary | bool
 
     - name: Set up backup cron job
       cron:

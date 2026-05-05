@@ -27,7 +27,7 @@ resource "libvirt_pool" "k8s" {
 }
 
 resource "libvirt_volume" "os_image" {
-  name = "os_image"
+  name = "os_image-${md5(var.source_vm)}"
   pool = libvirt_pool.k8s.name
   create = {
     content = {
@@ -42,7 +42,7 @@ resource "libvirt_volume" "os_image" {
 }
 
 resource "libvirt_volume" "disk_resized" {
-  name          = "disk"
+  name          = "disk-${md5(libvirt_volume.os_image.id)}"
   pool          = libvirt_pool.k8s.name
   capacity      = 20000000000
   capacity_unit = "B"
@@ -61,7 +61,7 @@ resource "libvirt_volume" "disk_resized" {
 
 resource "libvirt_volume" "worker" {
   count         = var.hosts
-  name          = "worker_${count.index}.qcow2"
+  name          = "worker_${count.index}-${md5(libvirt_volume.disk_resized.id)}.qcow2"
   pool          = libvirt_pool.k8s.name
   capacity      = 20000000000
   capacity_unit = "B"
@@ -97,12 +97,17 @@ resource "libvirt_cloudinit_disk" "commoninit" {
 
 resource "libvirt_volume" "cloudinit_vol" {
   count = var.hosts
-  name  = "commoninit_${var.hostnames[count.index]}.iso"
+  name  = "commoninit_${var.hostnames[count.index]}-${md5(libvirt_cloudinit_disk.commoninit[count.index].user_data)}.iso"
   pool  = libvirt_pool.k8s.name
   create = {
     content = {
       url = libvirt_cloudinit_disk.commoninit[count.index].path
     }
+  }
+  lifecycle {
+    # The temp ISO path changes on every run even when content is identical.
+    # Volumes are immutable after creation; ignore URL drift to prevent false updates.
+    ignore_changes = [create]
   }
 }
 
@@ -145,6 +150,17 @@ resource "libvirt_domain" "domain-distro" {
 
   depends_on = [null_resource.nvram_init]
 
+  cpu = {
+    mode           = local.is_arm ? "custom" : "host-passthrough"
+    model          = local.is_arm ? "cortex-a57" : null
+    model_fallback = local.is_arm ? "allow" : null
+    topology = local.is_arm ? {
+      sockets = 1
+      cores   = var.vcpu
+      threads = 1
+    } : null
+  }
+
   os = {
     type         = "hvm"
     type_arch    = var.arch
@@ -170,6 +186,10 @@ resource "libvirt_domain" "domain-distro" {
 
     disks = [
       {
+        driver = {
+          name = "qemu"
+          type = "qcow2"
+        }
         source = {
           volume = {
             pool   = libvirt_pool.k8s.name

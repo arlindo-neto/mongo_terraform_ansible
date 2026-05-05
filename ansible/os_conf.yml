@@ -28,6 +28,21 @@
 
   tasks:
 
+    - name: Remove cloud-init loopback hostname entry
+      lineinfile:
+        path: /etc/hosts
+        regexp: "^127\\.0\\.1\\.1\\s+{{ ansible_facts['hostname'] }}\\b"
+        state: absent
+
+    - name: Populate /etc/hosts with all cluster nodes
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ hostvars[item]['ansible_host'] }}  {{ item }}"
+        regexp: "^[0-9.]+\\s+{{ item }}\\b"
+        state: present
+      loop: "{{ ansible_play_hosts_all }}"
+      when: hostvars[item]['ansible_host'] is defined
+
     - name: Tune sysctl values
       ansible.posix.sysctl:
         name: "{{ item.key }}"

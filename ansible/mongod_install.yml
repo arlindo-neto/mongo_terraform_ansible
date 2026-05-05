@@ -154,18 +154,40 @@
 
       when: vault_encryption | bool
 
+    - name: Stop mongod before fresh bootstrap
+      become: yes
+      service:
+        name: mongod
+        state: stopped
+      ignore_errors: true
+
+    - name: Wipe mongod data directory for fresh start
+      become: yes
+      find:
+        paths: "{{ mongod_path }}"
+        file_type: any
+        hidden: true
+      register: mongod_data_files
+
+    - name: Remove stale mongod data files
+      become: yes
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ mongod_data_files.files }}"
+
     - name: Start mongod on replica set member
       become: yes
       service:
         name: mongod
-        state: restarted
+        state: started
 
     - name: Prepare the init command for replica set
       template:
         src: "{{ rs_init_template }}"
         dest: /tmp/init-rs.js
         mode: 0644
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
     - name: Wait for MongoDB port
       wait_for:
@@ -180,7 +202,7 @@
         --port {{ mongo_port }}
         --host 127.0.0.1
         /tmp/init-rs.js
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
     - name: Wait for PRIMARY
       shell: >
@@ -195,7 +217,7 @@
       delay: 1
       until: primary_check.rc == 0
       changed_when: false
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
 - name: Create the local users & logrotate
   hosts: cfg:shards:replsets
@@ -225,14 +247,14 @@
         --host 127.0.0.1
         --eval 'db.createUser({user:"{{ mongo_admin_user }}",pwd:"{{ mongo_admin_password }}",roles:["root"]})'
       no_log: true
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
     - name: Prepare the commands to create the PBM and PMM users and roles
       template:
         src: templates/createUsers.js.j2
         dest: /tmp/createUsers.js
         mode: 0644
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
     - name: Create PBM and PMM users
       shell: >
@@ -243,7 +265,7 @@
         --host {{ ansible_facts['fqdn'] }}
         < /tmp/createUsers.js
       no_log: true
-      when: mongodb_primary | default(false)
+      when: mongodb_primary | default(false) | bool
 
     - name: Configure mongo shell alias
       lineinfile:
