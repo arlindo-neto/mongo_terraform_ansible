@@ -1,26 +1,26 @@
 variable "hosts" {
   type    = number
-  default = 3
+  default = 4
 }
 
 variable "hostnames" {
   type    = list(any)
-  default = ["db-1", "db-2", "db-3"]
+  default = ["db-1", "db-2", "db-3", "db-4"]
 }
 
 variable "interface" {
   type    = string
-  default = "ens01"
+  default = "enp0s2"
 }
 
 variable "source_vm" {
   type    = string
-  default = "sources/rocky9.qcow2"
+  default = "sources/debian12-amd64.qcow2"
 }
 
 variable "memory" {
   type    = list(any)
-  default = [2048, 2048, 2048]
+  default = [2048, 2048, 2048, 2048]
 }
 
 variable "vcpu" {
@@ -30,12 +30,12 @@ variable "vcpu" {
 
 variable "distros" {
   type    = list(any)
-  default = ["rocky"]
+  default = ["debian"]
 }
 
 variable "ips" {
   type    = list(any)
-  default = ["192.168.100.10", "192.168.100.11", "192.168.100.12"]
+  default = ["192.168.100.10", "192.168.100.11", "192.168.100.12", "192.168.100.13"]
 }
 
 variable "auth_key" {
@@ -45,4 +45,9 @@ variable "auth_key" {
 
 variable "vm_condition_poweron" {
   default = true
+}
+
+variable "domain_type" {
+  type    = string
+  default = "kvm"
 }

@@ -61,6 +61,11 @@ mongo_admin_password: percona
 
 mongod_log_path: /var/log/mongo/
 mongod_path: /var/lib/mongo/
+
+# Set to true only for fresh installs or deliberate re-initialisation.
+# When true, mongod is stopped and the entire data directory is wiped before
+# starting. Pass -e wipe_data=true on the command line to enable.
+wipe_data: false
 enable_audit: false
 audit_log_path: /var/log/mongo/auditLog.json
 

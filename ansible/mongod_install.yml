@@ -154,27 +154,30 @@
 
       when: vault_encryption | bool
 
-    - name: Stop mongod before fresh bootstrap
+    - name: Stop mongod before wiping data
       become: yes
       service:
         name: mongod
         state: stopped
       ignore_errors: true
+      when: wipe_data | default(false) | bool
 
-    - name: Wipe mongod data directory for fresh start
+    - name: Find mongod data files to wipe
       become: yes
       find:
         paths: "{{ mongod_path }}"
         file_type: any
         hidden: true
       register: mongod_data_files
+      when: wipe_data | default(false) | bool
 
-    - name: Remove stale mongod data files
+    - name: Remove mongod data files
       become: yes
       file:
         path: "{{ item.path }}"
         state: absent
-      loop: "{{ mongod_data_files.files }}"
+      loop: "{{ mongod_data_files.files | default([]) }}"
+      when: wipe_data | default(false) | bool
 
     - name: Start mongod on replica set member
       become: yes
