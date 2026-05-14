@@ -4,90 +4,51 @@ terraform {
   required_providers {
     libvirt = {
       source  = "dmacvicar/libvirt"
-      version = "0.9.7"
+      version = "0.8.3"
     }
   }
 }
 
 provider "libvirt" {
+  # uri = "qemu:///system?socket=/run/libvirt/libvirt-sock"
   uri = "qemu:///system"
-}
-
-locals {
-  is_arm  = var.arch == "aarch64"
-  machine = local.is_arm ? "virt" : "pc"
 }
 
 resource "libvirt_pool" "k8s" {
   name = "k8s"
   type = "dir"
-  target = {
-    path = abspath("${path.module}/pool")
-  }
+  path = abspath("${path.module}/pool")
 }
 
 resource "libvirt_volume" "os_image" {
-  name = "os_image-${md5(var.source_vm)}"
-  pool = libvirt_pool.k8s.name
-  create = {
-    content = {
-      url = "file://${abspath("${path.module}/${var.source_vm}")}"
-    }
-  }
-  target = {
-    format = {
-      type = "qcow2"
-    }
-  }
+  name   = "os_image"
+  pool   = libvirt_pool.k8s.name
+  source = "${path.module}/${var.source_vm}"
+  format = "qcow2"
 }
 
 resource "libvirt_volume" "disk_resized" {
-  name          = "disk-${md5(libvirt_volume.os_image.id)}"
-  pool          = libvirt_pool.k8s.name
-  capacity      = 20000000000
-  capacity_unit = "B"
-  backing_store = {
-    path = libvirt_volume.os_image.path
-    format = {
-      type = "qcow2"
-    }
-  }
-  target = {
-    format = {
-      type = "qcow2"
-    }
-  }
+  name           = "disk"
+  pool           = libvirt_pool.k8s.name
+  base_volume_id = libvirt_volume.os_image.id
+  size           = 20000000000 # 20GiB
 }
 
 resource "libvirt_volume" "worker" {
-  count         = var.hosts
-  name          = "worker_${count.index}-${md5(libvirt_volume.disk_resized.id)}.qcow2"
-  pool          = libvirt_pool.k8s.name
-  capacity      = 20000000000
-  capacity_unit = "B"
-  backing_store = {
-    path = libvirt_volume.disk_resized.path
-    format = {
-      type = "qcow2"
-    }
-  }
-  target = {
-    format = {
-      type = "qcow2"
-    }
-  }
+  name           = "worker_${count.index}.qcow2"
+  pool           = libvirt_pool.k8s.name
+  base_volume_id = libvirt_volume.disk_resized.id
+  count          = var.hosts
 }
 
 resource "libvirt_cloudinit_disk" "commoninit" {
-  count   = var.hosts
-  name    = "commoninit_${var.hostnames[count.index]}"
-  user_data = templatefile("${path.module}/templates/user_data.tpl", {
-    host_name = var.hostnames[count.index]
-    auth_key  = file("${path.module}/ssh_keys/opentofu.pub")
-  })
-  meta_data = yamlencode({
-    instance-id    = var.hostnames[count.index]
-    local-hostname = var.hostnames[count.index]
+  count = var.hosts
+  name  = "commoninit-rocky_${var.hostnames[count.index]}.iso"
+  pool  = libvirt_pool.k8s.name
+  user_data = templatefile("${path.module}/templates/user_data.tpl",
+    {
+      host_name = var.hostnames[count.index]
+      auth_key  = file("${path.module}/ssh_keys/opentofu.pub")
   })
   network_config = templatefile("${path.module}/templates/network_config.tpl", {
     interface = var.interface
@@ -95,154 +56,67 @@ resource "libvirt_cloudinit_disk" "commoninit" {
   })
 }
 
-resource "libvirt_volume" "cloudinit_vol" {
-  count = var.hosts
-  name  = "commoninit_${var.hostnames[count.index]}-${md5(libvirt_cloudinit_disk.commoninit[count.index].user_data)}.iso"
-  pool  = libvirt_pool.k8s.name
-  create = {
-    content = {
-      url = libvirt_cloudinit_disk.commoninit[count.index].path
-    }
-  }
-  lifecycle {
-    # The temp ISO path changes on every run even when content is identical.
-    # Volumes are immutable after creation; ignore URL drift to prevent false updates.
-    ignore_changes = [create]
-  }
-}
-
 resource "libvirt_network" "priv" {
-  name      = "priv"
+  # the name used by libvirt
+  name = "priv"
+
+  # mode can be: "nat" (default), "none", "route", "open", "bridge"
+  mode = "nat"
+
+  #  the domain used by the DNS server in this network
+  domain = "default.local"
+
+  dns {
+    enabled    = true
+    local_only = true
+  }
+
+  # Whether the network should be started automatically when the host boots
   autostart = true
-  forward = {
-    mode = "nat"
-  }
-  domain = {
-    name       = "default.local"
-    local_only = "yes"
-  }
-  ips = [
-    {
-      address = "192.168.100.1"
-      netmask = "255.255.255.0"
-    }
-  ]
-}
 
-# Pre-create NVRAM files from the template so libvirt can write UEFI variables.
-# Required for aarch64 UEFI domains — without a pre-seeded NVRAM file the
-# domain definition fails because libvirt cannot create one at define time.
-resource "null_resource" "nvram_init" {
-  for_each = local.is_arm && var.nvram_template != "" ? toset(var.hostnames) : toset([])
-
-  provisioner "local-exec" {
-    command = "cp -n ${var.nvram_template} /var/lib/libvirt/qemu/nvram/${each.value}_VARS.fd && chmod 0660 /var/lib/libvirt/qemu/nvram/${each.value}_VARS.fd"
-  }
+  #  list of subnets the addresses allowed for domains connected
+  # also derived to define the host addresses
+  # also derived to define the addresses served by the DHCP server
+  addresses = ["192.168.100.0/24"]
 }
 
 resource "libvirt_domain" "domain-distro" {
-  count       = var.hosts
-  name        = var.hostnames[count.index]
-  memory      = var.memory[count.index]
-  memory_unit = "MiB"
-  vcpu        = var.vcpu
-  type        = var.domain_type
+  count     = var.hosts
+  name      = var.hostnames[count.index]
+  memory    = var.memory[count.index]
+  vcpu      = var.vcpu
+  cloudinit = element(libvirt_cloudinit_disk.commoninit.*.id, count.index)
 
-  depends_on = [null_resource.nvram_init]
-
-  cpu = {
-    mode           = local.is_arm ? "custom" : "host-passthrough"
-    model          = local.is_arm ? "cortex-a57" : null
-    model_fallback = local.is_arm ? "allow" : null
-    topology = local.is_arm ? {
-      sockets = 1
-      cores   = var.vcpu
-      threads = 1
-    } : null
+  network_interface {
+    network_name = "priv"
+    addresses    = [var.ips[count.index]]
+  }
+  console {
+    type        = "pty"
+    target_port = "0"
+    target_type = "serial"
+  }
+  console {
+    type        = "pty"
+    target_port = "1"
+    target_type = "virtio"
   }
 
-  os = {
-    type         = "hvm"
-    type_arch    = var.arch
-    type_machine = local.machine
-    loader          = local.is_arm && var.firmware != "" ? var.firmware : null
-    loader_type     = local.is_arm && var.firmware != "" ? "pflash" : null
-    loader_readonly = local.is_arm && var.firmware != "" ? "yes" : null
-    nv_ram = local.is_arm && var.nvram_template != "" ? {
-      nv_ram = "/var/lib/libvirt/qemu/nvram/${var.hostnames[count.index]}_VARS.fd"
-    } : null
+  graphics {
+    type        = "vnc"
+    listen_type = "address"
   }
 
-  devices = {
-    consoles = [
-      {
-        type = "pty"
-        target = {
-          type = "serial"
-          port = 0
-        }
-      }
-    ]
-
-    disks = [
-      {
-        driver = {
-          name = "qemu"
-          type = "qcow2"
-        }
-        source = {
-          volume = {
-            pool   = libvirt_pool.k8s.name
-            volume = libvirt_volume.worker[count.index].name
-          }
-        }
-        target = {
-          dev = "vda"
-          bus = "virtio"
-        }
-      },
-      {
-        source = {
-          volume = {
-            pool   = libvirt_pool.k8s.name
-            volume = libvirt_volume.cloudinit_vol[count.index].name
-          }
-        }
-        target = {
-          dev = local.is_arm ? "vdb" : "sda"
-          bus = local.is_arm ? "virtio" : "sata"
-        }
-        readonly = true
-      }
-    ]
-
-    interfaces = [
-      {
-        model = {
-          type = "virtio"
-        }
-        source = {
-          network = {
-            network = libvirt_network.priv.name
-          }
-        }
-      }
-    ]
+  cpu {
+    mode = "host-passthrough"
   }
-}
-
-resource "null_resource" "starter" {
-  count = var.hosts
-  triggers = {
-    domain_id = libvirt_domain.domain-distro[count.index].id
-  }
-
-  provisioner "local-exec" {
-    command = "virsh -c qemu:///system start ${var.hostnames[count.index]} || true"
+  disk {
+    volume_id = element(libvirt_volume.worker.*.id, count.index)
   }
 }
 
 resource "null_resource" "shutdowner" {
+  # iterate with for_each over Vms list ( my *.tf file creates VMs from list)
   for_each = toset(var.hostnames)
   triggers = {
     trigger = var.vm_condition_poweron
@@ -251,4 +125,8 @@ resource "null_resource" "shutdowner" {
   provisioner "local-exec" {
     command = var.vm_condition_poweron ? "echo 'do nothing'" : "virsh -c qemu:///system shutdown ${each.value}"
   }
+}
+
+variable "vm_condition_poweron" {
+  default = true
 }
