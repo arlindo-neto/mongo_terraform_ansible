@@ -126,6 +126,22 @@ terraform apply -var 'vm_condition_poweron=false'
 tofu apply -var 'vm_condition_poweron=false'
 ```
 
+## Restarting VMs After Host Reboot
+
+The `null_resource.starter` provisioners only run once (on first `tofu apply`). After a host reboot the VMs are shut off but `tofu apply` reports "No changes" because the provisioner already ran.
+
+To restart the VMs via tofu, taint the starter resources and re-apply:
+
+```bash
+tofu taint 'null_resource.starter[0]'
+tofu taint 'null_resource.starter[1]'
+tofu taint 'null_resource.starter[2]'
+tofu taint 'null_resource.starter[3]'
+tofu apply
+```
+
+This forces the `virsh start` command to re-execute for each VM.
+
 ## Credits
 
 This project makes extensive use of the excellent [terraform-provider-libvirt](https://github.com/dmacvicar/terraform-provider-libvirt). Special thanks to the maintainers for allowing us to manage KVM/Libvirt resources with Terraform.

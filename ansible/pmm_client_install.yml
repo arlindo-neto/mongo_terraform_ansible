@@ -61,7 +61,7 @@
         state: started
 
     - name: Point pmm-agent to the PMM server
-      shell: pmm-admin config --server-url=https://{{ pmm_server_user }}:{{ pmm_server_pwd }}@{{ hostvars[groups['pmm'][0]].ansible_facts['fqdn'] }}:{{ pmm_external_port }} --server-insecure-tls --force
+      shell: pmm-admin config --server-url=https://{{ pmm_server_user }}:{{ pmm_server_pwd }}@{{ hostvars[groups['pmm'][0]]['pmm_server_address'] | default(hostvars[groups['pmm'][0]].ansible_facts['fqdn']) }}:{{ pmm_external_port }} --server-insecure-tls --force
       register: pmm_config_result
       retries: 3
       delay: 1
